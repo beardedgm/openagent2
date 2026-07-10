@@ -110,7 +110,7 @@ describe('auth', () => {
     expect(statuses[1]).toBe(400);
   });
 
-  it('rate limits login attempts', async () => {
+  it('rate limits per-email login attempts', async () => {
     let last = 0;
     for (let i = 0; i < 11; i++) {
       const res = await request(app)
@@ -120,4 +120,13 @@ describe('auth', () => {
     }
     expect(last).toBe(429);
   });
+
+  it('rate limits by IP across malformed attempts', async () => {
+    let last = 0;
+    for (let i = 0; i < 31; i++) {
+      const res = await request(app).post('/api/v1/auth/login').send({ nope: true });
+      last = res.status;
+    }
+    expect(last).toBe(429);
+  }, 20000);
 });
