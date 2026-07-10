@@ -9,12 +9,20 @@ import { loginSchema, registerSchema } from '../validators/auth.js';
 
 export const authRouter = Router();
 
-const authLimiter = rateLimit({ name: 'auth', max: 10, windowMs: 15 * 60 * 1000 });
+const authLimiter = rateLimit({ name: 'auth', max: 30, windowMs: 15 * 60 * 1000 });
+
+const loginEmailLimiter = rateLimit({
+  name: 'authEmail',
+  max: 10,
+  windowMs: 15 * 60 * 1000,
+  keyFn: (req) => String((req.body as { email?: string })?.email ?? '').toLowerCase(),
+});
 
 authRouter.post(
   '/login',
   authLimiter,
   validate(loginSchema),
+  loginEmailLimiter,
   asyncHandler(async (req, res) => {
     const user = await login(req, req.body);
     res.json({ user: toPublicUser(user) });

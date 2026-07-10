@@ -41,6 +41,11 @@ export async function register(
     throw new AppError(400, 'This invitation link is invalid or has expired');
   if (await User.findOne({ email: invitation.email }))
     throw new AppError(409, 'An account with this email already exists');
+  const claimed = await Invitation.findOneAndUpdate(
+    { tokenHash, acceptedAt: null, expiresAt: { $gt: new Date() } },
+    { $set: { acceptedAt: new Date() } },
+  );
+  if (!claimed) throw new AppError(400, 'This invitation link is invalid or has expired');
   const user = await User.create({
     email: invitation.email,
     hashedPassword: await hashPassword(input.password),
@@ -48,8 +53,6 @@ export async function register(
     officeId: invitation.officeId,
     displayName: input.displayName,
   });
-  invitation.acceptedAt = new Date();
-  await invitation.save();
   await regenerate(req);
   req.session.userId = user.id;
   logEngagement('login', user.id);

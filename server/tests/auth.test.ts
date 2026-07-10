@@ -88,6 +88,28 @@ describe('auth', () => {
     expect(res.status).toBe(400);
   });
 
+  it('handles concurrent registration attempts with the same token', async () => {
+    const admin = await makeUser('admin3@x.com', 'officeAdmin');
+    await Invitation.create({
+      email: 'race@x.com',
+      role: 'agent',
+      invitedBy: admin.id,
+      tokenHash: createHash('sha256').update('race-token').digest('hex'),
+      expiresAt: new Date(Date.now() + 86400000),
+    });
+    const [r1, r2] = await Promise.all([
+      request(app)
+        .post('/api/v1/auth/register')
+        .send({ token: 'race-token', password: 'Password1!', displayName: 'A' }),
+      request(app)
+        .post('/api/v1/auth/register')
+        .send({ token: 'race-token', password: 'Password1!', displayName: 'B' }),
+    ]);
+    const statuses = [r1.status, r2.status].sort();
+    expect(statuses[0]).toBe(201);
+    expect(statuses[1]).toBe(400);
+  });
+
   it('rate limits login attempts', async () => {
     let last = 0;
     for (let i = 0; i < 11; i++) {
