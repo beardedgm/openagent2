@@ -3,11 +3,13 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 
-for (const p of ['.env', '../.env']) {
-  const full = resolve(process.cwd(), p);
-  if (existsSync(full)) {
-    config({ path: full });
-    break;
+if (process.env.NODE_ENV !== 'test') {
+  for (const p of ['.env', '../.env']) {
+    const full = resolve(process.cwd(), p);
+    if (existsSync(full)) {
+      config({ path: full });
+      break;
+    }
   }
 }
 
