@@ -1,10 +1,11 @@
 import { Bell, LayoutDashboard, LogOut, Menu, Settings, UserSquare, Users } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useLogout, useMe, usePublicSettings } from '../api/hooks';
+import { useLogout, useMe, useNotifications, usePublicSettings } from '../api/hooks';
 import { useUiStore } from '../store/uiStore';
 import { applyAccentColor } from '../utils/applyAccentColor';
+import { NotificationsDrawer } from './NotificationsDrawer';
 
 // Below this viewport width, the 240px sidebar no longer fits comfortably alongside content
 // (see DESIGN.md §7). The sidebar becomes an off-canvas overlay, toggled by the same
@@ -44,6 +45,9 @@ export function AppShell() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const logout = useLogout();
   const navigate = useNavigate();
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { data: notifData } = useNotifications();
+  const unread = notifData?.unreadCount ?? 0;
 
   useEffect(() => {
     if (branding?.primaryColor) applyAccentColor(branding.primaryColor);
@@ -131,12 +135,34 @@ export function AppShell() {
           <strong style={{ fontSize: 16 }}>{branding?.brandName ?? 'Workspace'}</strong>
           <div style={{ flex: 1 }} />
           <button
-            disabled
-            aria-label="Notifications"
-            title="Coming soon"
-            style={{ ...iconButtonStyle, color: 'var(--color-text-muted)' }}
+            aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+            aria-expanded={notifOpen}
+            onClick={() => setNotifOpen((o) => !o)}
+            style={{ ...iconButtonStyle, position: 'relative' }}
           >
             <Bell size={20} />
+            {unread > 0 && (
+              <span
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  minWidth: 18,
+                  height: 18,
+                  padding: '0 4px',
+                  borderRadius: 999,
+                  display: 'grid',
+                  placeItems: 'center',
+                  background: 'var(--color-accent)',
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {unread > 99 ? '99+' : unread}
+              </span>
+            )}
           </button>
           {me && (
             <button
@@ -214,6 +240,7 @@ export function AppShell() {
           }
         }
       `}</style>
+      <NotificationsDrawer open={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

@@ -46,3 +46,18 @@ export interface Invitation {
   officeId: string | null;
   expiresAt: string;
 }
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  link: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+}

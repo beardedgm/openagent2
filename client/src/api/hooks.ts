@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Invitation, PublicSettings, Settings, User } from './types';
+import type { Invitation, NotificationsResponse, PublicSettings, Settings, User } from './types';
 
 export function useMe() {
   return useQuery({
@@ -46,6 +46,14 @@ export function useInvitations() {
   return useQuery({
     queryKey: ['invitations'],
     queryFn: async () => (await api.get<{ invitations: Invitation[] }>('/users/invitations')).data.invitations,
+  });
+}
+
+export function useNotifications() {
+  return useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => (await api.get<NotificationsResponse>('/notifications')).data,
+    refetchInterval: 60_000, // keep the bell count fresh
   });
 }
 

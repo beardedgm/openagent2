@@ -35,6 +35,7 @@ function mockAuthAs(user: User) {
   getMock.mockImplementation(async (url: string) => {
     if (url === '/auth/me') return { data: { user } };
     if (url === '/settings/public') return { data: { settings: brandSettings } };
+    if (url === '/notifications') return { data: { notifications: [], unreadCount: 0, nextCursor: null } };
     throw new Error(`Unhandled GET ${url}`);
   });
 }
