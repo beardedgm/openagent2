@@ -93,7 +93,8 @@ export function ProfilePage() {
     return null;
   }
 
-  const canEdit = !!me && (me.id === user.id || me.role === 'broker' || me.role === 'officeAdmin');
+  const isSelf = !!me && me.id === user.id;
+  const canEdit = isSelf || me?.role === 'broker' || me?.role === 'officeAdmin';
   const officeName = settings?.officeLocations.find((o) => o._id === user.officeId)?.name;
 
   return (
@@ -140,18 +141,23 @@ export function ProfilePage() {
 
         {canEdit && (
           <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-            <label style={secondaryButtonStyle}>
-              Change photo
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadAvatar.mutate(file);
-                }}
-              />
-            </label>
+            {/* POST /uploads/avatar always sets the AUTHENTICATED caller's photoUrl (self-only by
+                design in Stage 1), so the upload control is shown only on your own profile.
+                Admin-set photos would need a new server route. */}
+            {isSelf && (
+              <label style={secondaryButtonStyle}>
+                Change photo
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadAvatar.mutate(file);
+                  }}
+                />
+              </label>
+            )}
             {!editing && (
               <Button
                 variant="secondary"
