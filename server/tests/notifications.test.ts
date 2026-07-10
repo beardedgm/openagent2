@@ -83,8 +83,9 @@ describe('notification routes', () => {
     const agent = await loginAs(app, 'n1@x.com');
     const me = (await User.findOne({ email: 'n1@x.com' }))!;
     const other = await User.create({ email: 'o@x.com', hashedPassword: 'x', role: 'agent', displayName: 'o' });
-    // Explicit distinct createdAt values — a same-millisecond tie would make the
-    // $lt cursor skip rows and flake. Mongoose keeps a caller-provided createdAt.
+    // Explicit distinct createdAt values keep the newest-first ordering deterministic.
+    // Mongoose keeps a caller-provided createdAt. (Same-millisecond ties are covered
+    // by the dedicated tie-break test below.)
     for (let i = 0; i < 25; i++) {
       await Notification.create({
         userId: me.id,
@@ -105,6 +106,56 @@ describe('notification routes', () => {
     const page2 = await agent.get(`/api/v1/notifications?before=${encodeURIComponent(res.body.nextCursor)}`);
     expect(page2.body.notifications).toHaveLength(5);
     expect(page2.body.notifications.map((n: { title: string }) => n.title)).not.toContain('not mine');
+    expect(page2.body.nextCursor).toBeNull(); // final partial page
+  });
+
+  it('paginates without dropping rows when createdAt ties span the page boundary', async () => {
+    const app = createApp();
+    const agent = await loginAs(app, 'n3@x.com');
+    const me = (await User.findOne({ email: 'n3@x.com' }))!;
+    const base = Date.now();
+    for (let i = 0; i < 25; i++) {
+      // Rows 17–22 share one exact millisecond, straddling the 20-row page boundary.
+      const tied = i >= 17 && i <= 22;
+      await Notification.create({
+        userId: me.id,
+        type: 'invitationAccepted',
+        title: `t${i}`,
+        createdAt: new Date(tied ? base - 17 * 60_000 : base - i * 60_000),
+      } as never);
+    }
+    const page1 = await agent.get('/api/v1/notifications');
+    expect(page1.status).toBe(200);
+    expect(page1.body.notifications).toHaveLength(20);
+    const page2 = await agent.get(`/api/v1/notifications?before=${encodeURIComponent(page1.body.nextCursor)}`);
+    expect(page2.status).toBe(200);
+    expect(page2.body.notifications).toHaveLength(5);
+    const titles = [...page1.body.notifications, ...page2.body.notifications].map((n: { title: string }) => n.title);
+    expect(new Set(titles).size).toBe(25); // every row seen exactly once across pages
+    expect([...titles].sort()).toEqual(Array.from({ length: 25 }, (_, i) => `t${i}`).sort());
+  });
+
+  it('ignores a malformed cursor and serves the first page', async () => {
+    const app = createApp();
+    const agent = await loginAs(app, 'n4@x.com');
+    const me = (await User.findOne({ email: 'n4@x.com' }))!;
+    for (let i = 0; i < 25; i++) {
+      await Notification.create({
+        userId: me.id,
+        type: 'invitationAccepted',
+        title: `m${i}`,
+        createdAt: new Date(Date.now() - i * 60_000),
+      } as never);
+    }
+    const res = await agent.get('/api/v1/notifications?before=notadate');
+    expect(res.status).toBe(200);
+    expect(res.body.notifications).toHaveLength(20);
+  });
+
+  it('returns 400 for a malformed notification id', async () => {
+    const app = createApp();
+    const agent = await loginAs(app, 'n5@x.com');
+    expect((await agent.post('/api/v1/notifications/abc/read')).status).toBe(400);
   });
 
   it('marks one read, then all read; cannot mark another user’s notification', async () => {

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -14,19 +15,33 @@ notificationsRouter.get(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id;
     const filter: Record<string, unknown> = { userId };
-    const before = typeof req.query.before === 'string' ? new Date(req.query.before) : null;
-    if (before && !Number.isNaN(before.getTime())) filter.createdAt = { $lt: before };
+    // Compound (createdAt, _id) cursor — "<ISO date>|<id>" — so same-millisecond
+    // rows straddling a page boundary are never skipped. Malformed cursors are
+    // ignored and the first page is served.
+    if (typeof req.query.before === 'string') {
+      const sep = req.query.before.indexOf('|');
+      const beforeDate = sep > 0 ? new Date(req.query.before.slice(0, sep)) : null;
+      const beforeId = sep > 0 ? req.query.before.slice(sep + 1) : '';
+      if (
+        beforeDate &&
+        !Number.isNaN(beforeDate.getTime()) &&
+        mongoose.Types.ObjectId.isValid(beforeId)
+      ) {
+        filter.$or = [
+          { createdAt: { $lt: beforeDate } },
+          { createdAt: beforeDate, _id: { $lt: beforeId } },
+        ];
+      }
+    }
     const [notifications, unreadCount] = await Promise.all([
-      Notification.find(filter).sort({ createdAt: -1 }).limit(PAGE_SIZE),
+      Notification.find(filter).sort({ createdAt: -1, _id: -1 }).limit(PAGE_SIZE),
       Notification.countDocuments({ userId, readAt: null }),
     ]);
+    const last = notifications.length === PAGE_SIZE ? notifications[notifications.length - 1] : null;
     res.json({
       notifications: notifications.map(toPublicNotification),
       unreadCount,
-      nextCursor:
-        notifications.length === PAGE_SIZE
-          ? (notifications[notifications.length - 1].get('createdAt') as Date).toISOString()
-          : null,
+      nextCursor: last ? `${(last.get('createdAt') as Date).toISOString()}|${last.id as string}` : null,
     });
   }),
 );
