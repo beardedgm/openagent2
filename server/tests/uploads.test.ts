@@ -57,4 +57,25 @@ describe('uploads', () => {
       .attach('file', Buffer.from('plain'), { filename: 'x.txt', contentType: 'text/plain' });
     expect(res.status).toBe(400);
   });
+
+  it('stores extension from mimetype, not client filename', async () => {
+    const broker = await loginAs(app, 'b3@x.com', 'broker');
+    const res = await broker
+      .post('/api/v1/uploads/avatar')
+      .attach('file', PNG, { filename: 'evil.html', contentType: 'image/png' });
+    expect(res.status).toBe(200);
+    expect(res.body.url).toMatch(/\.png$/);
+    const served = await broker.get(res.body.url);
+    expect(served.status).toBe(200);
+    expect(served.headers['content-type']).toContain('image/png');
+  });
+
+  it('rejects oversized uploads with 400', async () => {
+    const broker = await loginAs(app, 'b4@x.com', 'broker');
+    const big = Buffer.alloc(5 * 1024 * 1024 + 1);
+    const res = await broker
+      .post('/api/v1/uploads/avatar')
+      .attach('file', big, { filename: 'big.png', contentType: 'image/png' });
+    expect(res.status).toBe(400);
+  });
 });

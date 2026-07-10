@@ -24,7 +24,7 @@ uploadsRouter.post(
   upload.single('file'),
   asyncHandler(async (req, res) => {
     const file = requireImage(req.file);
-    const url = await storage.putPublic(makeKey('logo', file.originalname), file.buffer, file.mimetype);
+    const url = await storage.putPublic(makeKey('logo', file.mimetype), file.buffer, file.mimetype);
     const settings = await getSettings();
     settings.logoUrl = url;
     await settings.save();
@@ -37,7 +37,7 @@ uploadsRouter.post(
   upload.single('file'),
   asyncHandler(async (req, res) => {
     const file = requireImage(req.file);
-    const url = await storage.putPublic(makeKey('avatars', file.originalname), file.buffer, file.mimetype);
+    const url = await storage.putPublic(makeKey('avatars', file.mimetype), file.buffer, file.mimetype);
     req.user!.photoUrl = url;
     await req.user!.save();
     res.json({ url });

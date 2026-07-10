@@ -39,14 +39,13 @@ class R2Storage implements StoragePort {
 
 export const storage: StoragePort = env.STORAGE_DRIVER === 'r2' ? new R2Storage() : new LocalStorage();
 
-export function makeKey(prefix: string, originalName: string): string {
-  const dot = originalName.lastIndexOf('.');
-  const ext =
-    dot >= 0
-      ? originalName
-          .slice(dot + 1)
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '')
-      : 'bin';
-  return `${prefix}/${randomBytes(12).toString('hex')}.${ext || 'bin'}`;
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+
+export function makeKey(prefix: string, contentType: string): string {
+  const ext = EXT_BY_TYPE[contentType] ?? 'bin';
+  return `${prefix}/${randomBytes(12).toString('hex')}.${ext}`;
 }
