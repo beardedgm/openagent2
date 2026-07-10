@@ -60,6 +60,21 @@ const deactivatedAgent = {
   createdAt: '',
 };
 
+const brokerUser = {
+  id: 'u4',
+  email: 'bob@example.com',
+  role: 'broker',
+  officeId: null,
+  status: 'active',
+  displayName: 'Bob Broker',
+  phone: '',
+  photoUrl: '',
+  bio: '',
+  emailPrefs: {},
+  lastLoginAt: null,
+  createdAt: '',
+};
+
 const invitation = {
   id: 'inv1',
   email: 'invitee@example.com',
@@ -95,7 +110,7 @@ describe('UsersPage', () => {
     getMock.mockImplementation(async (url: string) => {
       if (url === '/auth/me') return { data: { user: officeAdminUser } };
       if (url === '/users?includeDeactivated=true') {
-        return { data: { users: [officeAdminUser, agentUser, deactivatedAgent] } };
+        return { data: { users: [officeAdminUser, agentUser, deactivatedAgent, brokerUser] } };
       }
       if (url === '/users/invitations') return { data: { invitations: [invitation] } };
       if (url === '/settings') return { data: { settings } };
@@ -106,12 +121,13 @@ describe('UsersPage', () => {
     deleteMock.mockReset();
   });
 
-  it('renders the users table with all three users and the pending invitation email', async () => {
+  it('renders the users table with all users and the pending invitation email', async () => {
     render(wrap());
 
     expect(await screen.findByText('Ada Admin')).toBeInTheDocument();
     expect(screen.getByText('Ana Agent')).toBeInTheDocument();
     expect(screen.getByText('Dana Deactivated')).toBeInTheDocument();
+    expect(screen.getByText('Bob Broker')).toBeInTheDocument();
     expect(screen.getByText('invitee@example.com')).toBeInTheDocument();
   });
 
@@ -120,6 +136,13 @@ describe('UsersPage', () => {
 
     const roleSelect = await screen.findByLabelText('Role for Ana Agent');
     expect(within(roleSelect).queryByText('Broker')).not.toBeInTheDocument();
+  });
+
+  it('disables both selects on a broker row when viewed as officeAdmin', async () => {
+    render(wrap());
+
+    expect(await screen.findByLabelText('Role for Bob Broker')).toBeDisabled();
+    expect(screen.getByLabelText('Office for Bob Broker')).toBeDisabled();
   });
 
   it('hides the Deactivate button on your own row but shows it on the agent row', async () => {

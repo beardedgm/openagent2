@@ -248,7 +248,9 @@ export function UsersPage() {
             <tbody>
               {users?.map((u) => {
                 const isOwnRow = me?.id === u.id;
-                const roleSelectDisabled = u.role === 'broker' && !isBroker;
+                // Broker rows are read-only for non-brokers: the server rejects role AND office
+                // changes on broker targets from officeAdmins, so both selects are disabled.
+                const brokerRowLocked = u.role === 'broker' && !isBroker;
                 return (
                   <tr key={u.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: 'var(--space-2)' }}>
@@ -285,7 +287,7 @@ export function UsersPage() {
                       <select
                         aria-label={`Role for ${u.displayName}`}
                         value={u.role}
-                        disabled={roleSelectDisabled}
+                        disabled={brokerRowLocked}
                         onChange={(e) => patchUser.mutate({ id: u.id, body: { role: e.target.value } })}
                         style={selectStyle}
                       >
@@ -298,6 +300,7 @@ export function UsersPage() {
                       <select
                         aria-label={`Office for ${u.displayName}`}
                         value={u.officeId ?? ''}
+                        disabled={brokerRowLocked}
                         onChange={(e) =>
                           patchUser.mutate({ id: u.id, body: { officeId: e.target.value || null } })
                         }
