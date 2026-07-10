@@ -235,3 +235,46 @@ describe('post routes', () => {
     expect((await admin.post('/api/v1/posts').send({ title: 'x', bodyHtml: '', publishAt: 'tomorrow' })).status).toBe(400);
   });
 });
+
+describe('comment routes', () => {
+  it('any user comments on a visible post; author and admin can delete, others cannot', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'ca@x.com', 'broker');
+    const alice = await loginAs(app, 'cb@x.com', 'agent');
+    const bob = await loginAs(app, 'cc@x.com', 'agent');
+    const post = (await admin.post('/api/v1/posts').send({ title: 'C', bodyHtml: '' })).body.post;
+
+    const created = await alice.post(`/api/v1/posts/${post.id}/comments`).send({ body: 'First!' });
+    expect(created.status).toBe(201);
+    expect(created.body.comment.author.displayName).toBe('cb@x.com');
+
+    const list = await bob.get(`/api/v1/posts/${post.id}/comments`);
+    expect(list.body.comments).toHaveLength(1);
+
+    expect((await bob.delete(`/api/v1/posts/${post.id}/comments/${created.body.comment.id}`)).status).toBe(403);
+    expect((await alice.delete(`/api/v1/posts/${post.id}/comments/${created.body.comment.id}`)).status).toBe(200);
+
+    const again = await bob.post(`/api/v1/posts/${post.id}/comments`).send({ body: 'Second' });
+    expect((await admin.delete(`/api/v1/posts/${post.id}/comments/${again.body.comment.id}`)).status).toBe(200);
+    expect(await Comment.countDocuments()).toBe(0);
+  });
+
+  it('rejects comments when the author disabled them', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'cd@x.com', 'broker');
+    const agent = await loginAs(app, 'ce@x.com', 'agent');
+    const post = (await admin.post('/api/v1/posts').send({ title: 'Quiet', bodyHtml: '', commentsEnabled: false }))
+      .body.post;
+    expect((await agent.post(`/api/v1/posts/${post.id}/comments`).send({ body: 'hi' })).status).toBe(403);
+  });
+
+  it('cannot comment on a post outside visibility', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'cf@x.com', 'broker');
+    const agent = await loginAs(app, 'cg@x.com', 'agent', '64b000000000000000000001');
+    const post = (
+      await admin.post('/api/v1/posts').send({ title: 'B only', bodyHtml: '', officeId: '64b000000000000000000002' })
+    ).body.post;
+    expect((await agent.post(`/api/v1/posts/${post.id}/comments`).send({ body: 'hi' })).status).toBe(404);
+  });
+});

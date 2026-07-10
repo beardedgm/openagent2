@@ -3,9 +3,10 @@ import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { validate } from '../middleware/validate.js';
+import { Comment, toPublicComment } from '../models/Comment.js';
 import { Post, toPublicPost, type PostDoc } from '../models/Post.js';
 import { createPost, deletePost, setPinned, updatePost } from '../services/postService.js';
-import { createPostSchema, updatePostSchema } from '../validators/posts.js';
+import { createCommentSchema, createPostSchema, updatePostSchema } from '../validators/posts.js';
 
 const PAGE_SIZE = 20;
 const AUTHOR_FIELDS = 'displayName photoUrl';
@@ -109,5 +110,42 @@ postsRouter.delete(
     const post = await setPinned(req.params.id, false);
     await post.populate('authorId', AUTHOR_FIELDS);
     res.json({ post: toPublicPost(post) });
+  }),
+);
+
+postsRouter.get(
+  '/:id/comments',
+  asyncHandler(async (req, res) => {
+    const post = await loadVisiblePost(req);
+    const comments = await Comment.find({ postId: post.id })
+      .sort({ createdAt: 1 })
+      .populate('authorId', AUTHOR_FIELDS);
+    res.json({ comments: comments.map(toPublicComment) });
+  }),
+);
+
+postsRouter.post(
+  '/:id/comments',
+  validate(createCommentSchema),
+  asyncHandler(async (req, res) => {
+    const post = await loadVisiblePost(req);
+    if (!post.commentsEnabled) throw new AppError(403, 'Comments are disabled on this post');
+    const comment = await Comment.create({ postId: post.id, authorId: req.user!.id, body: req.body.body });
+    await comment.populate('authorId', AUTHOR_FIELDS);
+    res.status(201).json({ comment: toPublicComment(comment) });
+  }),
+);
+
+postsRouter.delete(
+  '/:id/comments/:commentId',
+  asyncHandler(async (req, res) => {
+    const post = await loadVisiblePost(req);
+    const comment = await Comment.findOne({ _id: req.params.commentId, postId: post.id });
+    if (!comment) throw new AppError(404, 'Comment not found');
+    const me = req.user!;
+    if (String(comment.authorId) !== me.id && !isAdmin(me.role))
+      throw new AppError(403, 'Insufficient permissions');
+    await comment.deleteOne();
+    res.json({ ok: true });
   }),
 );

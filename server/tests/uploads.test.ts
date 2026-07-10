@@ -78,4 +78,21 @@ describe('uploads', () => {
       .attach('file', big, { filename: 'big.png', contentType: 'image/png' });
     expect(res.status).toBe(400);
   });
+
+  it('agent cannot upload a post-image but officeAdmin can', async () => {
+    const agent = await loginAs(app, 'a2@x.com', 'agent');
+    expect(
+      (
+        await agent
+          .post('/api/v1/uploads/post-image')
+          .attach('file', PNG, { filename: 'p.png', contentType: 'image/png' })
+      ).status,
+    ).toBe(403);
+    const officeAdmin = await loginAs(app, 'oa@x.com', 'officeAdmin');
+    const res = await officeAdmin
+      .post('/api/v1/uploads/post-image')
+      .attach('file', PNG, { filename: 'p.png', contentType: 'image/png' });
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBeTruthy();
+  });
 });
