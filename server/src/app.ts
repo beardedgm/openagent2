@@ -10,6 +10,7 @@ import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
+import { feedRouter } from './routes/feed.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { postsRouter } from './routes/posts.js';
 import { adminSettingsRouter, settingsRouter } from './routes/settings.js';
@@ -72,6 +73,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/settings', settingsRouter);
   app.use('/api/v1/admin/settings', adminSettingsRouter);
   app.use('/api/v1/notifications', notificationsRouter);
+  app.use('/api/v1/feed', feedRouter);
   if (env.STORAGE_DRIVER === 'local') app.use('/files', express.static(LOCAL_UPLOAD_DIR));
 
   if (prod) {
