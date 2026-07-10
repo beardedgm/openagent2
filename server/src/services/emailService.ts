@@ -45,3 +45,15 @@ export function invitationAcceptedEmail(displayName: string, profileLink: string
     </div>`,
   };
 }
+
+export function importantPostEmail(title: string, link: string): { subject: string; html: string } {
+  const safeTitle = escapeHtml(title);
+  return {
+    subject: `Important announcement: ${title}`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p>An important announcement was posted to your workspace:</p>
+      <p><strong>${safeTitle}</strong></p>
+      <p><a href="${link}">Read it on the message board</a></p>
+    </div>`,
+  };
+}
