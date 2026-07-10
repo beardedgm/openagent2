@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UsersPage } from './UsersPage';
@@ -145,6 +145,16 @@ describe('UsersPage', () => {
     expect(screen.getByLabelText('Office for Bob Broker')).toBeDisabled();
     // The locked select still displays the broker's actual role, not a blank value.
     expect(screen.getByLabelText('Role for Bob Broker')).toHaveValue('broker');
+  });
+
+  it('PATCHes the new role when the agent row role select changes', async () => {
+    patchMock.mockResolvedValue({ data: { user: { ...agentUser, role: 'officeAdmin' } } });
+    render(wrap());
+
+    const roleSelect = await screen.findByLabelText('Role for Ana Agent');
+    fireEvent.change(roleSelect, { target: { value: 'officeAdmin' } });
+
+    await waitFor(() => expect(patchMock).toHaveBeenCalledWith('/users/u2', { role: 'officeAdmin' }));
   });
 
   it('hides the Deactivate button on your own row but shows it on the agent row', async () => {

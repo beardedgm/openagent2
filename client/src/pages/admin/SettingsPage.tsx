@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { useSettings } from '../../api/hooks';
+import type { Settings } from '../../api/types';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Field } from '../../components/ui/Field';
@@ -66,8 +67,13 @@ export function SettingsPage() {
   }, [settings, seeded]);
 
   const save = useMutation({
-    mutationFn: (body: Record<string, unknown>) => api.patch('/admin/settings', body),
-    onSuccess: async () => {
+    mutationFn: (body: Record<string, unknown>) => api.patch<{ settings: Settings }>('/admin/settings', body),
+    onSuccess: async (res) => {
+      // Re-seed the whole form from the saved document so office rows added in this
+      // session pick up their server-minted _ids. Without this, a second Save on the
+      // same mount would re-send those rows without _id, Mongo would mint fresh ids,
+      // and any users assigned to the office in the meantime would dangle.
+      seedFrom(res.data.settings);
       await qc.invalidateQueries({ queryKey: ['settings'] });
       await qc.invalidateQueries({ queryKey: ['settings', 'public'] });
     },
@@ -90,7 +96,7 @@ export function SettingsPage() {
   const hexIsValid = HEX_PATTERN.test(primaryColor);
   const hasEmptyOfficeName = offices.some((o) => !o.name.trim());
   const hasInvalidFeedUrl = rssFeeds.some((f) => !/^https?:\/\//i.test(f.trim()));
-  const canSave = !hasEmptyOfficeName && !hasInvalidFeedUrl && !save.isPending;
+  const canSave = hexIsValid && !hasEmptyOfficeName && !hasInvalidFeedUrl && !save.isPending;
 
   function updateOffice(index: number, patch: Partial<OfficeRow>) {
     setOffices((prev) => prev.map((o, i) => (i === index ? { ...o, ...patch } : o)));
@@ -113,13 +119,13 @@ export function SettingsPage() {
   }
 
   function handleSave() {
-    const body: Record<string, unknown> = {
+    // canSave guarantees the hex is valid here, so primaryColor is always included.
+    save.mutate({
       brandName,
+      primaryColor,
       officeLocations: offices,
       rssFeeds: rssFeeds.map((f) => f.trim()),
-    };
-    if (hexIsValid) body.primaryColor = primaryColor;
-    save.mutate(body);
+    });
   }
 
   const saveErrorMessage = save.isError ? errorMessage(save.error, 'Could not save settings') : undefined;
@@ -154,11 +160,13 @@ export function SettingsPage() {
           Saved
         </p>
       )}
-      {(hasEmptyOfficeName || hasInvalidFeedUrl) && (
+      {(hasEmptyOfficeName || hasInvalidFeedUrl || !hexIsValid) && (
         <p style={{ color: 'var(--color-warning)', fontSize: 13 }}>
           {hasEmptyOfficeName
             ? 'Every office needs a name before you can save.'
-            : 'Every feed URL must start with http:// or https:// before you can save.'}
+            : hasInvalidFeedUrl
+              ? 'Every feed URL must start with http:// or https:// before you can save.'
+              : 'The primary color must be a valid hex value before you can save.'}
         </p>
       )}
 
@@ -183,7 +191,7 @@ export function SettingsPage() {
               label="Primary color (hex)"
               value={primaryColor}
               onChange={(e) => setPrimaryColor(e.target.value)}
-              error={!hexIsValid ? 'Must be a hex color like #1a2b3c' : undefined}
+              error={!hexIsValid ? 'Enter a 6-digit hex color like #1a2b3c' : undefined}
             />
           </div>
         </div>

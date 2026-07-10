@@ -68,10 +68,22 @@ export function UsersPage() {
 
   const inviteErrorMessage = invite.isError ? errorMessage(invite.error, 'Could not send invitation') : undefined;
 
+  function closeInvite() {
+    setInviteOpen(false);
+    setInviteEmail('');
+    setInviteRole('agent');
+    setInviteOfficeId('');
+    // The dialog's close event also fires when the invite success handler closes the
+    // modal — that close must keep the emailSent warning the handler just set, so
+    // only user-initiated cancels (no fresh success) clear it.
+    if (!invite.isSuccess) setInviteEmailWarning(null);
+  }
+
   // Resend state (tracked via the mutation's own variables/status — only one resend in flight/shown at a time)
   const resend = useMutation({
     mutationFn: (id: string) => api.post<{ emailSent: boolean }>(`/users/invitations/${id}/resend`),
     onSuccess: async () => {
+      setInviteEmailWarning(null);
       await qc.invalidateQueries({ queryKey: ['invitations'] });
     },
   });
@@ -114,11 +126,7 @@ export function UsersPage() {
         </Button>
       </div>
 
-      <Modal
-        title="Invite user"
-        open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-      >
+      <Modal title="Invite user" open={inviteOpen} onClose={closeInvite}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -174,7 +182,7 @@ export function UsersPage() {
             <Button type="submit" disabled={invite.isPending}>
               {invite.isPending ? 'Sending…' : 'Send invite'}
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setInviteOpen(false)}>
+            <Button type="button" variant="secondary" onClick={closeInvite}>
               Cancel
             </Button>
           </div>
@@ -287,7 +295,7 @@ export function UsersPage() {
                       <select
                         aria-label={`Role for ${u.displayName}`}
                         value={u.role}
-                        disabled={brokerRowLocked}
+                        disabled={brokerRowLocked || patchUser.isPending}
                         onChange={(e) => patchUser.mutate({ id: u.id, body: { role: e.target.value } })}
                         style={selectStyle}
                       >
@@ -303,7 +311,7 @@ export function UsersPage() {
                       <select
                         aria-label={`Office for ${u.displayName}`}
                         value={u.officeId ?? ''}
-                        disabled={brokerRowLocked}
+                        disabled={brokerRowLocked || patchUser.isPending}
                         onChange={(e) =>
                           patchUser.mutate({ id: u.id, body: { officeId: e.target.value || null } })
                         }
