@@ -48,6 +48,25 @@ describe('pollAllFeeds', () => {
     expect(await RssItem.countDocuments()).toBe(1);
   });
 
+  it('guards unsafe link schemes and caps stored string sizes', async () => {
+    const settings = await getSettings();
+    settings.rssFeeds = ['https://a.com/rss'];
+    await settings.save();
+    parseURL.mockResolvedValue({
+      title: 'A News',
+      items: [
+        { guid: 'evil', title: 'XSS attempt', link: 'javascript:alert(1)' },
+        { guid: 'long', title: 'x'.repeat(10_000), link: 'https://a.com/long' },
+      ],
+    });
+    await pollAllFeeds();
+    const evil = await RssItem.findOne({ guid: 'evil' });
+    expect(evil).not.toBeNull();
+    expect(evil!.link).toBe('');
+    const long = await RssItem.findOne({ guid: 'long' });
+    expect(long!.title).toHaveLength(300);
+  });
+
   it('does nothing with no feeds configured', async () => {
     await pollAllFeeds();
     expect(parseURL).not.toHaveBeenCalled();

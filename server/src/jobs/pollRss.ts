@@ -15,12 +15,18 @@ export async function pollAllFeeds(): Promise<void> {
       const ops = (feed.items ?? []).slice(0, MAX_ITEMS_PER_FEED).flatMap((item) => {
         const guid = item.guid ?? item.link;
         if (!guid || !item.title) return [];
+        // Feed items are untrusted third-party content; scheme-guarding here protects every future renderer.
+        const safeLink = /^https?:\/\//i.test(item.link ?? '') ? item.link! : '';
         return [
           {
             updateOne: {
               filter: { feedUrl, guid },
               update: {
-                $set: { title: item.title, link: item.link ?? '', sourceTitle: feed.title ?? feedUrl },
+                $set: {
+                  title: item.title.slice(0, 300),
+                  link: safeLink,
+                  sourceTitle: (feed.title ?? feedUrl).slice(0, 120),
+                },
                 $setOnInsert: { publishedAt: item.isoDate ? new Date(item.isoDate) : new Date() },
               },
               upsert: true,
@@ -28,7 +34,8 @@ export async function pollAllFeeds(): Promise<void> {
           },
         ];
       });
-      if (ops.length > 0) await RssItem.bulkWrite(ops);
+      // Unordered so a partial failure doesn't abort sibling upserts.
+      if (ops.length > 0) await RssItem.bulkWrite(ops, { ordered: false });
     } catch (err) {
       logger.error({ err, feedUrl }, 'rss poll failed for feed');
     }
