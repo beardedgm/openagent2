@@ -11,6 +11,7 @@ export async function verifyTurnstile(token: string | undefined, ip: string | un
       response: token,
       ...(ip ? { remoteip: ip } : {}),
     }),
+    signal: AbortSignal.timeout(5000),
   });
   const data = (await res.json()) as { success: boolean };
   return data.success;
