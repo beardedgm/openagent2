@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+uploads/
+*.log
+
+# environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# session memory tooling
+.remember/
