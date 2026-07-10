@@ -3,6 +3,8 @@ import express from 'express';
 import session from 'express-session';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
@@ -67,6 +69,16 @@ export function createApp(): express.Express {
   app.use('/api/v1/settings', settingsRouter);
   app.use('/api/v1/admin/settings', adminSettingsRouter);
   if (env.STORAGE_DRIVER === 'local') app.use('/files', express.static(LOCAL_UPLOAD_DIR));
+
+  if (prod) {
+    // compiled file lives at server/dist/src/app.js → repo root is ../../..
+    const clientDist = fileURLToPath(new URL('../../../client/dist', import.meta.url));
+    app.use(express.static(clientDist));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/files/')) return next();
+      res.sendFile(join(clientDist, 'index.html'));
+    });
+  }
 
   app.use(notFound);
   app.use(errorHandler);

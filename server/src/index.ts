@@ -11,4 +11,7 @@ async function start(): Promise<void> {
   app.listen(env.PORT, () => logger.info(`listening on :${env.PORT}`));
 }
 
-void start();
+start().catch((err) => {
+  logger.error(err, 'fatal: server failed to start');
+  process.exit(1);
+});
