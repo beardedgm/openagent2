@@ -93,6 +93,10 @@ usersRouter.patch(
       if (!isAdmin(me.role)) throw new AppError(403, 'Insufficient permissions');
       if ((role === 'broker' || target.role === 'broker') && me.role !== 'broker')
         throw new AppError(403, 'Only a broker can change broker roles');
+      if (target.role === 'broker' && role !== undefined && role !== 'broker') {
+        const activeBrokers = await User.countDocuments({ role: 'broker', status: 'active' });
+        if (activeBrokers <= 1) throw new AppError(400, 'Cannot remove the last active broker');
+      }
       if (role !== undefined) target.role = role;
       if (officeId !== undefined) target.officeId = officeId as never;
     }

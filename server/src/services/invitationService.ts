@@ -18,8 +18,7 @@ async function issueAndSend(invitation: InvitationDoc): Promise<boolean> {
   const link = `${env.APP_DOMAIN}/register?token=${token}`;
   const { subject, html } = invitationEmail(settings.brandName, link);
   try {
-    await sendEmail(invitation.email, subject, html);
-    return true;
+    return await sendEmail(invitation.email, subject, html);
   } catch (err) {
     logger.error(err, 'invitation email failed');
     return false;

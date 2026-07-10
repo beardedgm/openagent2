@@ -4,16 +4,17 @@ import { logger } from '../config/logger.js';
 
 const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
 
-export async function sendEmail(to: string, subject: string, html: string): Promise<void> {
+export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   if (!resend) {
     if (env.NODE_ENV === 'production') {
       logger.warn({ to, subject }, 'RESEND_API_KEY not set — email NOT sent');
-    } else {
-      logger.info({ to, subject, html }, 'email (console driver)');
+      return false;
     }
-    return;
+    logger.info({ to, subject, html }, 'email (console driver)');
+    return true;
   }
   await resend.emails.send({ from: env.EMAIL_FROM, to, subject, html });
+  return true;
 }
 
 function escapeHtml(s: string): string {

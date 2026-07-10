@@ -10,6 +10,7 @@ vi.mock('../src/services/emailService.js', async (importOriginal) => {
     ...mod,
     sendEmail: vi.fn(async (to: string, _subject: string, html: string) => {
       sent.push({ to, html });
+      return true;
     }),
   };
 });
@@ -135,5 +136,21 @@ describe('users & invitations', () => {
     expect((await admin.delete(`/api/v1/users/${target.id}`)).status).toBe(200);
     const adminId = (await admin.get('/api/v1/auth/me')).body.user.id;
     expect((await admin.delete(`/api/v1/users/${adminId}`)).status).toBe(400);
+  });
+
+  it('refuses to demote the last active broker', async () => {
+    const broker = await loginAs(app, 'solo@x.com', 'broker');
+    const meId = (await broker.get('/api/v1/auth/me')).body.user.id;
+    expect((await broker.patch(`/api/v1/users/${meId}`).send({ role: 'agent' })).status).toBe(400);
+    await User.create({ email: 'b2@x.com', hashedPassword: await hashPassword('Password1!'), role: 'broker', displayName: 'B2' });
+    expect((await broker.patch(`/api/v1/users/${meId}`).send({ role: 'agent' })).status).toBe(200);
+  });
+
+  it('returns 400 for malformed ids and officeIds', async () => {
+    const admin = await loginAs(app, 'admin@x.com', 'officeAdmin');
+    expect((await admin.get('/api/v1/users/not-an-objectid')).status).toBe(400);
+    expect(
+      (await admin.post('/api/v1/users/invite').send({ email: 'o@x.com', role: 'agent', officeId: 'nope' })).status,
+    ).toBe(400);
   });
 });
