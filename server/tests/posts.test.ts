@@ -1,9 +1,12 @@
+import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app.js';
 import { ActivityEvent } from '../src/models/ActivityEvent.js';
 import { Comment } from '../src/models/Comment.js';
 import { Notification } from '../src/models/Notification.js';
 import { Post } from '../src/models/Post.js';
 import { User } from '../src/models/User.js';
+import { hashPassword } from '../src/utils/password.js';
 
 const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn(async () => true) }));
 vi.mock('../src/services/emailService.js', async (importOriginal) => ({
@@ -141,5 +144,94 @@ describe('postService', () => {
     await expect(setPinned(posts[3].id, true)).rejects.toThrow(/3 pinned/);
     await setPinned(posts[0].id, false);
     await expect(setPinned(posts[3].id, true)).resolves.toBeTruthy();
+  });
+});
+
+async function loginAs(app: ReturnType<typeof createApp>, email: string, role: string, officeId: string | null = null) {
+  await User.create({ email, hashedPassword: await hashPassword('Password1!'), role, displayName: email, officeId });
+  const agent = request.agent(app);
+  await agent.post('/api/v1/auth/login').send({ email, password: 'Password1!' });
+  return agent;
+}
+
+describe('post routes', () => {
+  it('officeAdmin creates a post; agent cannot', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'pa@x.com', 'officeAdmin');
+    const agent = await loginAs(app, 'pb@x.com', 'agent');
+    expect((await agent.post('/api/v1/posts').send({ title: 'No', bodyHtml: '' })).status).toBe(403);
+    const res = await admin.post('/api/v1/posts').send({ title: 'Yes', bodyHtml: '<p>hi</p>' });
+    expect(res.status).toBe(201);
+    expect(res.body.post.author.displayName).toBe('pa@x.com');
+    expect(res.body.post.bodyHtml).toBe('<p>hi</p>');
+  });
+
+  it('agents see published all/own-office posts only; admins see scheduled too', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'pc@x.com', 'broker');
+    const officeA = '64b000000000000000000001';
+    const agent = await loginAs(app, 'pd@x.com', 'agent', officeA);
+    await admin.post('/api/v1/posts').send({ title: 'For everyone', bodyHtml: '' });
+    await admin.post('/api/v1/posts').send({ title: 'For office A', bodyHtml: '', officeId: officeA });
+    await admin.post('/api/v1/posts').send({ title: 'For office B', bodyHtml: '', officeId: '64b000000000000000000002' });
+    await admin.post('/api/v1/posts').send({
+      title: 'Scheduled',
+      bodyHtml: '',
+      publishAt: new Date(Date.now() + 3_600_000).toISOString(),
+    });
+
+    const agentList = await agent.get('/api/v1/posts');
+    expect(agentList.body.posts.map((p: { title: string }) => p.title).sort()).toEqual(['For everyone', 'For office A']);
+    const adminList = await admin.get('/api/v1/posts');
+    expect(adminList.body.total).toBe(4);
+
+    const officeB = adminList.body.posts.find((p: { title: string }) => p.title === 'For office B');
+    expect((await agent.get(`/api/v1/posts/${officeB.id}`)).status).toBe(404);
+    expect((await admin.get(`/api/v1/posts/${officeB.id}`)).status).toBe(200);
+  });
+
+  it('keyword search matches body text', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'pe@x.com', 'broker');
+    await admin.post('/api/v1/posts').send({ title: 'A', bodyHtml: '<p>quarterly commission schedule</p>' });
+    await admin.post('/api/v1/posts').send({ title: 'B', bodyHtml: '<p>parking reminder</p>' });
+    const res = await admin.get('/api/v1/posts?q=commission');
+    expect(res.body.posts).toHaveLength(1);
+    expect(res.body.posts[0].title).toBe('A');
+  });
+
+  it('pins via route with the max-3 limit surfaced as 400', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'pf@x.com', 'broker');
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const r = await admin.post('/api/v1/posts').send({ title: `P${i}`, bodyHtml: '' });
+      ids.push(r.body.post.id);
+    }
+    for (let i = 0; i < 3; i++) expect((await admin.post(`/api/v1/posts/${ids[i]}/pin`)).status).toBe(200);
+    expect((await admin.post(`/api/v1/posts/${ids[3]}/pin`)).status).toBe(400);
+    expect((await admin.delete(`/api/v1/posts/${ids[0]}/pin`)).status).toBe(200);
+    expect((await admin.post(`/api/v1/posts/${ids[3]}/pin`)).status).toBe(200);
+    // pinned posts sort first
+    const list = await admin.get('/api/v1/posts');
+    expect(list.body.posts[0].pinnedAt).not.toBeNull();
+  });
+
+  it('deleting a post removes its comments', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'pg@x.com', 'broker');
+    const r = await admin.post('/api/v1/posts').send({ title: 'Del', bodyHtml: '' });
+    const adminUser = (await User.findOne({ email: 'pg@x.com' }))!;
+    await Comment.create({ postId: r.body.post.id, authorId: adminUser.id, body: 'hi' });
+    expect((await admin.delete(`/api/v1/posts/${r.body.post.id}`)).status).toBe(200);
+    expect(await Comment.countDocuments()).toBe(0);
+    expect((await admin.get(`/api/v1/posts/${r.body.post.id}`)).status).toBe(404);
+  });
+
+  it('rejects invalid bodies', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'ph@x.com', 'broker');
+    expect((await admin.post('/api/v1/posts').send({ bodyHtml: '' })).status).toBe(400); // no title
+    expect((await admin.post('/api/v1/posts').send({ title: 'x', bodyHtml: '', publishAt: 'tomorrow' })).status).toBe(400);
   });
 });
