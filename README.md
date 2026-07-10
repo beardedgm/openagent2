@@ -22,6 +22,7 @@ Prerequisites: Node 20+, a MongoDB instance (Atlas M0 free tier or local).
 | `MONGODB_URI` | Connection string for the app database. |
 | `SESSION_SECRET` | Session-signing secret, minimum 16 characters. |
 | `APP_DOMAIN` | Base URL used to build links (e.g. invitation emails). Defaults to `http://localhost:5173` for local dev; set to your real origin in production. |
+| `NODE_ENV` | Set to `production` on your deployment host. Enables SPA serving, the security headers (CSP), and secure session cookies. Leave unset in local dev. |
 
 ### Seed-time (used only by `npm run seed`)
 
@@ -64,7 +65,7 @@ DESIGN.md  Authoritative reference for UI/UX decisions
 
 The app builds and runs as a single service: `npm run build` then `npm start` serves both the API and the SPA on `PORT`. On Render's free tier:
 
-- Add all required/optional env vars in the dashboard (never commit `.env`).
+- Set `NODE_ENV=production` plus all required/optional env vars in the dashboard (never commit `.env`).
 - Render's disk is ephemeral — set `STORAGE_DRIVER=r2` with the R2 variables above so uploads survive redeploys.
 - Free instances sleep after idle. A free [UptimeRobot](https://uptimerobot.com/) monitor pinging `/api/v1/health` keeps the service awake, comfortably within Render's 750 free hours/month.
 
