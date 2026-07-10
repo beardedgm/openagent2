@@ -27,4 +27,8 @@ describe('rateLimit', () => {
     expect((await request(app).get('/k?u=b')).status).toBe(200);
     expect((await request(app).get('/k?u=a')).status).toBe(429);
   });
+
+  it('rejects windows longer than the TTL', () => {
+    expect(() => rateLimit({ name: 'big', max: 1, windowMs: 3_600_001 })).toThrow(/windowMs/);
+  });
 });

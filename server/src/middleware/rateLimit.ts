@@ -16,6 +16,9 @@ export interface RateLimitOptions {
 }
 
 export function rateLimit(opts: RateLimitOptions) {
+  if (opts.windowMs > 3_600_000) {
+    throw new Error('rateLimit windowMs must be <= 1 hour (TTL index expires hits after 3600s)');
+  }
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const key = `${opts.name}:${opts.keyFn ? opts.keyFn(req) : (req.ip ?? 'unknown')}`;
