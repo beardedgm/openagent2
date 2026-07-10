@@ -119,7 +119,12 @@ export function AppShell() {
             borderBottom: '1px solid var(--color-border)',
           }}
         >
-          <button aria-label="Toggle navigation" onClick={toggleSidebar} style={iconButtonStyle}>
+          <button
+            aria-label="Toggle navigation"
+            aria-expanded={sidebarOpen}
+            onClick={toggleSidebar}
+            style={iconButtonStyle}
+          >
             <Menu size={20} />
           </button>
           {branding?.logoUrl && <img src={branding.logoUrl} alt="" style={{ height: 32 }} />}

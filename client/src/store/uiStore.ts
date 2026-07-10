@@ -6,6 +6,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  sidebarOpen: true,
+  // Closed by default on narrow viewports; 880px matches the DESIGN.md §7 collapse breakpoint.
+  sidebarOpen: typeof window === 'undefined' ? true : window.innerWidth > 880,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 }));

@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import type { CSSProperties } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useMe, useSettings, useUser } from '../api/hooks';
@@ -28,20 +27,6 @@ const ROLE_TONE: Record<Role, 'accent' | 'success' | 'neutral'> = {
   external: 'neutral',
 };
 
-const secondaryButtonStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: 44,
-  padding: '0 var(--space-4)',
-  background: 'var(--color-surface)',
-  color: 'var(--color-text)',
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-sm)',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
 export function ProfilePage() {
   const { id } = useParams();
   const { data: user, isLoading, error } = useUser(id);
@@ -53,6 +38,13 @@ export function ProfilePage() {
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [bio, setBio] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // React Router does not remount this page on :id changes, so exit edit mode (and its stale
+  // form state, seeded from the previous profile) whenever the viewed user changes.
+  useEffect(() => {
+    setEditing(false);
+  }, [id]);
 
   const updateUser = useMutation({
     mutationFn: (body: { displayName: string; phone: string; bio: string }) => api.patch(`/users/${id}`, body),
@@ -78,6 +70,11 @@ export function ProfilePage() {
   const uploadErrorMessage =
     uploadAvatar.isError && isAxiosError(uploadAvatar.error)
       ? ((uploadAvatar.error.response?.data as { error?: string })?.error ?? 'Upload failed')
+      : undefined;
+
+  const saveErrorMessage =
+    updateUser.isError && isAxiosError(updateUser.error)
+      ? ((updateUser.error.response?.data as { error?: string })?.error ?? 'Could not save changes')
       : undefined;
 
   if (isLoading) return <Spinner label="Loading profile" />;
@@ -145,23 +142,30 @@ export function ProfilePage() {
                 design in Stage 1), so the upload control is shown only on your own profile.
                 Admin-set photos would need a new server route. */}
             {isSelf && (
-              <label style={secondaryButtonStyle}>
-                Change photo
+              <>
+                <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+                  Change photo
+                </Button>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
-                  style={{ display: 'none' }}
+                  hidden
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
+                    const file = e.currentTarget.files?.[0];
                     if (file) uploadAvatar.mutate(file);
+                    // Clear the input so selecting the same file again (e.g. after a failed
+                    // upload) still fires this change handler.
+                    e.currentTarget.value = '';
                   }}
                 />
-              </label>
+              </>
             )}
             {!editing && (
               <Button
                 variant="secondary"
                 onClick={() => {
+                  updateUser.reset();
                   setDisplayName(user.displayName);
                   setPhone(user.phone);
                   setBio(user.bio);
@@ -209,6 +213,11 @@ export function ProfilePage() {
                 }}
               />
             </div>
+            {saveErrorMessage && (
+              <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginBottom: 'var(--space-3)' }}>
+                {saveErrorMessage}
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <Button type="submit" disabled={updateUser.isPending}>
                 {updateUser.isPending ? 'Saving…' : 'Save'}
