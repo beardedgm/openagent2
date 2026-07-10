@@ -33,3 +33,14 @@ export function invitationEmail(brandName: string, link: string): { subject: str
     </div>`,
   };
 }
+
+export function invitationAcceptedEmail(displayName: string, profileLink: string): { subject: string; html: string } {
+  const safeName = escapeHtml(displayName);
+  return {
+    subject: `${safeName} accepted your invitation`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p><strong>${safeName}</strong> accepted your invitation and joined the workspace.</p>
+      <p><a href="${profileLink}">View their profile</a></p>
+    </div>`,
+  };
+}

@@ -1,11 +1,17 @@
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
+import { env } from '../config/env.js';
+import { logger } from '../config/logger.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { Invitation } from '../models/Invitation.js';
+import { getSettings } from '../models/Settings.js';
 import { User, type UserDoc } from '../models/User.js';
 import { hashPassword, verifyPassword } from '../utils/password.js';
 import { verifyTurnstile } from '../utils/turnstile.js';
+import { emitActivity } from './activityService.js';
+import { invitationAcceptedEmail } from './emailService.js';
 import { logEngagement } from './engagementService.js';
+import { notify } from './notificationService.js';
 
 function regenerate(req: Request): Promise<void> {
   return new Promise((resolve, reject) =>
@@ -56,7 +62,23 @@ export async function register(
   await regenerate(req);
   req.session.userId = user.id;
   logEngagement('login', user.id);
-  // Stage 2 wiring: notify invitation.invitedBy ("invitation accepted") once Notifications exist.
+  // Side effects must never fail a registration that already created the account.
+  try {
+    const settings = await getSettings();
+    await emitActivity({
+      type: 'agentJoined',
+      message: `${user.displayName} joined ${settings.brandName}`,
+      link: `/profile/${user.id}`,
+      actorId: user.id,
+    });
+    await notify(
+      [String(invitation.invitedBy)],
+      { type: 'invitationAccepted', title: `${user.displayName} accepted your invitation`, link: `/profile/${user.id}` },
+      invitationAcceptedEmail(user.displayName, `${env.APP_DOMAIN}/profile/${user.id}`),
+    );
+  } catch (err) {
+    logger.error(err, 'post-registration side effects failed');
+  }
   // Stage 3 wiring: auto-assign Settings.onboardingTaskTemplateId once Tasks exist.
   return user;
 }
