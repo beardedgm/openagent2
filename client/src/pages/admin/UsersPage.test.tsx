@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UsersPage } from './UsersPage';
@@ -155,6 +155,32 @@ describe('UsersPage', () => {
     fireEvent.change(roleSelect, { target: { value: 'officeAdmin' } });
 
     await waitFor(() => expect(patchMock).toHaveBeenCalledWith('/users/u2', { role: 'officeAdmin' }));
+  });
+
+  it('keeps the email-not-sent warning visible after the invite modal closes', async () => {
+    postMock.mockResolvedValue({
+      data: {
+        invitation: { id: 'inv2', email: 'new@example.com', role: 'agent', expiresAt: '2999-01-01T00:00:00.000Z' },
+        emailSent: false,
+      },
+    });
+    render(wrap());
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite user' }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send invite' }));
+
+    const warning = await screen.findByRole('status');
+    expect(warning).toHaveTextContent('Invitation created but the email could not be sent — use Resend.');
+
+    // The dialog's queued close event (which resets the invite draft) must not wipe the
+    // warning. The modal's children unmount as soon as open flips, so also flush the
+    // timer queue to guarantee the close event has actually fired before re-asserting.
+    await waitFor(() => expect(screen.queryByLabelText('Email')).not.toBeInTheDocument());
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Invitation created but the email could not be sent — use Resend.',
+    );
   });
 
   it('hides the Deactivate button on your own row but shows it on the agent row', async () => {

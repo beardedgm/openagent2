@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useInvitations, useMe, useSettings, useUsers } from '../../api/hooks';
@@ -47,6 +47,11 @@ export function UsersPage() {
   const [inviteRole, setInviteRole] = useState<'agent' | 'officeAdmin' | 'broker'>('agent');
   const [inviteOfficeId, setInviteOfficeId] = useState('');
   const [inviteEmailWarning, setInviteEmailWarning] = useState<string | null>(null);
+  // The dialog's close event also fires when the invite success handler closes the
+  // modal programmatically — that close must not wipe the emailSent warning the
+  // handler just set. The success handler arms this ref right before closing;
+  // closeInvite consumes it (one-shot) and skips clearing the warning.
+  const suppressClearRef = useRef(false);
 
   const invite = useMutation({
     mutationFn: (body: { email: string; role: string; officeId: string | null }) =>
@@ -56,6 +61,7 @@ export function UsersPage() {
       ),
     onSuccess: async (res) => {
       await qc.invalidateQueries({ queryKey: ['invitations'] });
+      suppressClearRef.current = true;
       setInviteOpen(false);
       setInviteEmail('');
       setInviteRole('agent');
@@ -73,10 +79,11 @@ export function UsersPage() {
     setInviteEmail('');
     setInviteRole('agent');
     setInviteOfficeId('');
-    // The dialog's close event also fires when the invite success handler closes the
-    // modal — that close must keep the emailSent warning the handler just set, so
-    // only user-initiated cancels (no fresh success) clear it.
-    if (!invite.isSuccess) setInviteEmailWarning(null);
+    if (suppressClearRef.current) {
+      suppressClearRef.current = false;
+    } else {
+      setInviteEmailWarning(null);
+    }
   }
 
   // Resend state (tracked via the mutation's own variables/status — only one resend in flight/shown at a time)
