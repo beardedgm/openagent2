@@ -77,9 +77,13 @@ async function announceOrSchedule(post: PostDoc): Promise<void> {
   if (post.publishAt <= new Date()) {
     await publishPostSideEffects(post.id);
     // publishPostSideEffects re-fetches its own document, so sync the caller's
-    // in-memory copy — the guard above guarantees the update just succeeded.
+    // in-memory copy — in the create/single-actor path the update just succeeded.
     post.notifiedAt = new Date();
   } else {
+    // Task 11: real scheduling must cancel any existing job for this post first
+    // (cancel-then-schedule) — repeated edits would otherwise accumulate duplicate
+    // jobs (harmless today: the latch + publishAt guard make duplicates no-op,
+    // but they'd pile up in agendaJobs).
     await schedulePostPublish(post.id, post.publishAt);
   }
 }

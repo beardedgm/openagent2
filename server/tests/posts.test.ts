@@ -11,7 +11,7 @@ vi.mock('../src/services/emailService.js', async (importOriginal) => ({
   sendEmail: sendEmailMock,
 }));
 
-import { createPost, publishPostSideEffects, setPinned, updatePost } from '../src/services/postService.js';
+import { createPost, deletePost, publishPostSideEffects, setPinned, updatePost } from '../src/services/postService.js';
 
 describe('Post model', () => {
   it('applies defaults', async () => {
@@ -120,6 +120,17 @@ describe('postService', () => {
     expect(updated.bodyHtml).toBe('<p>b</p>');
     expect(updated.notifiedAt).not.toBeNull(); // still announced
     expect(await Notification.countDocuments({ type: 'postPublished' })).toBe(0); // no re-announcement (broker was sole user)
+  });
+
+  it('deletePost removes the post and cascades to its comments', async () => {
+    const broker = await makeUser('br7@x.com', 'broker');
+    const post = await createPost({ title: 'Doomed', bodyHtml: '' }, broker);
+    await Comment.create({ postId: post.id, authorId: broker.id, body: 'one' });
+    await Comment.create({ postId: post.id, authorId: broker.id, body: 'two' });
+    await deletePost(post.id);
+    expect(await Post.findById(post.id)).toBeNull();
+    expect(await Comment.countDocuments({ postId: post.id })).toBe(0);
+    await expect(deletePost('64b000000000000000000009')).rejects.toThrow(/not found/i);
   });
 
   it('setPinned enforces the max of 3', async () => {
