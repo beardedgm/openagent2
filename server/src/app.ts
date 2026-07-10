@@ -8,6 +8,7 @@ import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
+import { usersRouter } from './routes/users.js';
 
 declare module 'express-session' {
   interface SessionData {
@@ -55,6 +56,7 @@ export function createApp(): express.Express {
 
   // --- routers (mounted by later tasks) ---
   app.use('/api/v1/auth', authRouter);
+  app.use('/api/v1/users', usersRouter);
 
   app.use(notFound);
   app.use(errorHandler);
