@@ -6,6 +6,8 @@ import { DirectoryPage } from './pages/DirectoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
+import { SettingsPage } from './pages/admin/SettingsPage';
+import { UsersPage } from './pages/admin/UsersPage';
 
 export function App() {
   return (
@@ -22,6 +24,22 @@ export function App() {
         <Route path="/" element={<DashboardPage />} />
         <Route path="/directory" element={<DirectoryPage />} />
         <Route path="/profile/:id" element={<ProfilePage />} />
+        <Route
+          path="/admin/users"
+          element={
+            <RequireAuth min="officeAdmin">
+              <UsersPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <RequireAuth min="broker">
+              <SettingsPage />
+            </RequireAuth>
+          }
+        />
       </Route>
     </Routes>
   );
