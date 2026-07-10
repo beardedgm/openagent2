@@ -293,7 +293,10 @@ export function UsersPage() {
                       >
                         <option value="agent">Agent</option>
                         <option value="officeAdmin">Office Admin</option>
-                        {isBroker && <option value="broker">Broker</option>}
+                        {/* For non-broker viewers this option only ever appears on broker rows,
+                            where the select is disabled — it exists so the locked row displays
+                            "Broker" instead of a blank value. */}
+                        {(isBroker || u.role === 'broker') && <option value="broker">Broker</option>}
                       </select>
                     </td>
                     <td style={{ padding: 'var(--space-2)' }}>

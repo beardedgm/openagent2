@@ -143,6 +143,8 @@ describe('UsersPage', () => {
 
     expect(await screen.findByLabelText('Role for Bob Broker')).toBeDisabled();
     expect(screen.getByLabelText('Office for Bob Broker')).toBeDisabled();
+    // The locked select still displays the broker's actual role, not a blank value.
+    expect(screen.getByLabelText('Role for Bob Broker')).toHaveValue('broker');
   });
 
   it('hides the Deactivate button on your own row but shows it on the agent row', async () => {
