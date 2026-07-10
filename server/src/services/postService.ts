@@ -88,8 +88,10 @@ async function announceOrSchedule(post: PostDoc): Promise<void> {
   }
 }
 
-/** Idempotent: the notifiedAt latch is claimed atomically, so job retries,
- * reschedule races, and double calls announce exactly once. */
+/** At-most-once: the notifiedAt latch is claimed atomically, so retries/races
+ * never double-announce. If the process dies mid-fan-out after the latch is
+ * claimed, remaining notifications are lost (accepted trade-off — announcements
+ * are non-critical and visible on the board itself). */
 export async function publishPostSideEffects(postId: string): Promise<void> {
   const post = await Post.findOneAndUpdate(
     { _id: postId, notifiedAt: null, publishAt: { $lte: new Date() } },

@@ -20,7 +20,11 @@ export async function startAgenda(registerJobs: (a: Agenda) => void): Promise<vo
 }
 
 export async function stopAgenda(): Promise<void> {
-  await agenda?.stop();
+  if (!agenda) return;
+  // drain() waits for in-flight jobs to finish (stop() would unlock them
+  // immediately and process.exit would abort them mid-run); race a timeout so
+  // shutdown can't hang past Render's SIGKILL window.
+  await Promise.race([agenda.drain(), new Promise((r) => setTimeout(r, 25_000))]);
   agenda = null;
 }
 
