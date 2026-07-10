@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { pathToFileURL } from 'node:url';
 import { env } from '../src/config/env.js';
 import { getSettings } from '../src/models/Settings.js';
 import { User } from '../src/models/User.js';
@@ -28,7 +29,7 @@ export async function seed(opts: {
   return `Created broker account ${opts.email}.`;
 }
 
-const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('scripts/seed.ts');
+const isMain = !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
   const email = process.env.SEED_BROKER_EMAIL;
