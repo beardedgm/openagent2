@@ -153,3 +153,9 @@ These apply to every screen, not just the primitives above:
   fits comfortably, the sidebar should collapse (icon-only or off-canvas) rather than shrinking
   content below usable density — define the exact collapse breakpoint and pattern when the app
   shell component is built, and record it here.
+
+  **Decision (`AppShell.tsx`):** breakpoint is 880px. Above it, the sidebar sits inline in the
+  page's flex row (toggling it resizes the content area). At or below 880px, the same
+  `sidebarOpen` state instead switches the sidebar to a fixed-position off-canvas overlay
+  (`position: fixed`, full height below the 64px header, `--shadow-md` elevation) driven by the
+  same header "Toggle navigation" button — one state, two layouts depending on viewport.

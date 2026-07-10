@@ -12,7 +12,12 @@ export function TurnstileWidget({ onToken }: { onToken: (token: string) => void 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!SITE_KEY || !ref.current) return;
-    const render = () => window.turnstile?.render(ref.current!, { sitekey: SITE_KEY, callback: onToken });
+    const render = () =>
+      window.turnstile?.render(ref.current!, {
+        sitekey: SITE_KEY,
+        callback: onToken,
+        'expired-callback': () => onToken(''),
+      });
     if (window.turnstile) {
       render();
       return;

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { usePublicSettings } from '../api/hooks';
@@ -8,9 +8,13 @@ import { TurnstileWidget } from '../components/TurnstileWidget';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
+import { applyAccentColor } from '../utils/applyAccentColor';
 
 export function LoginPage() {
   const { data: branding } = usePublicSettings();
+  useEffect(() => {
+    if (branding?.primaryColor) applyAccentColor(branding.primaryColor);
+  }, [branding?.primaryColor]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string>();

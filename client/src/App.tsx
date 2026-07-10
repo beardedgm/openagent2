@@ -1,6 +1,10 @@
 import { Route, Routes } from 'react-router-dom';
+import { AppShell } from './components/AppShell';
 import { RequireAuth } from './components/RequireAuth';
+import { DashboardPage } from './pages/DashboardPage';
+import { DirectoryPage } from './pages/DirectoryPage';
 import { LoginPage } from './pages/LoginPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
 
 export function App() {
@@ -9,13 +13,16 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
-        path="/*"
         element={
           <RequireAuth>
-            <div>Signed in</div>
+            <AppShell />
           </RequireAuth>
         }
-      />
+      >
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/directory" element={<DirectoryPage />} />
+        <Route path="/profile/:id" element={<ProfilePage />} />
+      </Route>
     </Routes>
   );
 }

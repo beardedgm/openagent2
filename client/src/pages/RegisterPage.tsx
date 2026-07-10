@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { usePublicSettings } from '../api/hooks';
@@ -8,9 +8,13 @@ import { TurnstileWidget } from '../components/TurnstileWidget';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Field } from '../components/ui/Field';
+import { applyAccentColor } from '../utils/applyAccentColor';
 
 export function RegisterPage() {
   const { data: branding } = usePublicSettings();
+  useEffect(() => {
+    if (branding?.primaryColor) applyAccentColor(branding.primaryColor);
+  }, [branding?.primaryColor]);
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [displayName, setDisplayName] = useState('');
@@ -29,12 +33,17 @@ export function RegisterPage() {
     },
   });
 
+  const registerStatus = register.isError && isAxiosError(register.error) ? register.error.response?.status : undefined;
+
   const errorMessage =
     register.isError && isAxiosError(register.error)
       ? ((register.error.response?.data as { error?: string })?.error ?? 'Registration failed')
       : undefined;
 
-  if (!token) {
+  // A 400 means the token itself is invalid/expired/used — the link is permanently dead, so an
+  // interactive form is misleading. A 409 (account already exists) is left as an inline error
+  // since the form/token are otherwise fine.
+  if (!token || registerStatus === 400) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 'var(--space-4)' }}>
         <Card style={{ width: 'min(400px, 100%)' }}>
