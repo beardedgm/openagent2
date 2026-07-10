@@ -19,10 +19,6 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  // Let any fire-and-forget driver work queued by app.ts (e.g. connect-mongo's
-  // background TTL index creation) settle before closing the client; otherwise
-  // it surfaces as an unhandled MongoClientClosedError rejection.
-  await new Promise((resolve) => setTimeout(resolve, 100));
   await mongoose.disconnect();
   await mongod.stop();
 });

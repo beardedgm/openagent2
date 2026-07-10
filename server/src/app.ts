@@ -43,7 +43,10 @@ export function createApp(): express.Express {
       resave: false,
       saveUninitialized: false,
       rolling: true,
-      store: MongoStore.create({ client: mongoose.connection.getClient() as never }),
+      store: MongoStore.create({
+        client: mongoose.connection.getClient() as never,
+        autoRemove: env.NODE_ENV === 'test' ? 'disabled' : 'native',
+      }),
       cookie: {
         httpOnly: true,
         sameSite: 'lax',
