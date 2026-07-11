@@ -99,6 +99,10 @@ function applyInput(event: CalendarEventDoc, input: EventInput): void {
 
 function enforceKindRules(event: CalendarEventDoc, user: UserDoc): void {
   if (event.endAt <= event.startAt) throw new AppError(400, 'Event must end after it starts');
+  // Guards updates too (the create validator already rejects this): an until before
+  // start yields zero occurrences, silently vanishing the event from the calendar.
+  if (event.recurrenceUntil && event.recurrenceUntil < event.startAt)
+    throw new AppError(400, 'recurrenceUntil must not be before startAt');
   if (event.kind === 'personal') {
     // Personal events are private scheduling blocks — office-only features forced off.
     event.officeId = null as never;

@@ -105,6 +105,7 @@ eventsRouter.patch(
   '/:id',
   validate(updateEventSchema),
   asyncHandler(async (req, res) => {
+    await loadVisibleEvent(req); // invisible events 404 (no existence leak); service still 403s manage-vs-view
     const event = await updateEvent(req.params.id, req.body, req.user!);
     res.json({ event: toPublicEvent(event, req.user!.id) });
   }),
@@ -113,6 +114,7 @@ eventsRouter.patch(
 eventsRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
+    await loadVisibleEvent(req); // invisible events 404 (no existence leak); service still 403s manage-vs-view
     await deleteEvent(req.params.id, req.user!);
     res.json({ ok: true });
   }),

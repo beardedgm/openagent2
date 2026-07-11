@@ -340,4 +340,38 @@ describe('event routes', () => {
       ).status,
     ).toBe(400);
   });
+
+  it('mutations of an invisible personal event 404 (no existence leak)', async () => {
+    const app = createApp();
+    const agent = await loginAs(app, 'r9@x.com', 'agent');
+    const broker = await loginAs(app, 'r10@x.com', 'broker');
+    const created = await agent.post('/api/v1/events').send({
+      title: 'Private block', kind: 'personal',
+      startAt: '2026-08-11T15:00:00.000Z', endAt: '2026-08-11T16:00:00.000Z',
+    });
+    const id = created.body.event.id;
+    expect((await broker.patch(`/api/v1/events/${id}`).send({ title: 'Stolen' })).status).toBe(404);
+    expect((await broker.delete(`/api/v1/events/${id}`)).status).toBe(404);
+    // Still intact and editable by its owner.
+    expect((await agent.patch(`/api/v1/events/${id}`).send({ title: 'Still mine' })).status).toBe(200);
+  });
+
+  it('rejects a PATCH setting recurrenceUntil before startAt', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'r11@x.com', 'broker');
+    const created = await broker.post('/api/v1/events').send({
+      title: 'Weekly', kind: 'office', recurrence: 'weekly',
+      startAt: '2026-08-12T15:00:00.000Z', endAt: '2026-08-12T16:00:00.000Z',
+    });
+    const id = created.body.event.id;
+    expect(
+      (await broker.patch(`/api/v1/events/${id}`).send({ recurrenceUntil: '2026-08-01T00:00:00.000Z' })).status,
+    ).toBe(400);
+  });
+
+  it('rejects array-valued range params', async () => {
+    const app = createApp();
+    const agent = await loginAs(app, 'r12@x.com', 'agent');
+    expect((await agent.get('/api/v1/events?from[0]=2026-01-01&to=2026-01-02')).status).toBe(400);
+  });
 });
