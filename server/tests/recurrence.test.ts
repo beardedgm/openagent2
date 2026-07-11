@@ -62,6 +62,44 @@ describe('expandOccurrences', () => {
     ]);
   });
 
+  it('finds occurrences whose duration is longer than the recurrence step', () => {
+    // 3-day-long daily event: occurrences starting BEFORE the window can still overlap it.
+    // Exercises the `- duration` term in the skip-ahead formula.
+    const occs = expandOccurrences(
+      ev({ startAt: D('2026-01-05T00:00:00Z'), endAt: D('2026-01-08T00:00:00Z'), recurrence: 'daily' }),
+      D('2026-01-10T00:00:00Z'),
+      D('2026-01-11T00:00:00Z'),
+    );
+    expect(occs.map((o) => o.startAt.toISOString())).toEqual([
+      '2026-01-08T00:00:00.000Z',
+      '2026-01-09T00:00:00.000Z',
+      '2026-01-10T00:00:00.000Z',
+    ]);
+  });
+
+  it('includes an occurrence whose start is EXACTLY recurrenceUntil', () => {
+    const occs = expandOccurrences(
+      ev({ recurrence: 'weekly', recurrenceUntil: D('2026-01-19T15:00:00.000Z') }),
+      D('2026-01-01T00:00:00Z'),
+      D('2026-03-01T00:00:00Z'),
+    );
+    expect(occs.map((o) => o.startAt.toISOString())).toEqual([
+      '2026-01-05T15:00:00.000Z',
+      '2026-01-12T15:00:00.000Z',
+      '2026-01-19T15:00:00.000Z',
+    ]);
+  });
+
+  it('yields nothing when recurrenceUntil is before the event start', () => {
+    // A Task 6 validator rejects this input; this pins the pure function's behavior anyway.
+    const occs = expandOccurrences(
+      ev({ recurrence: 'weekly', recurrenceUntil: D('2026-01-01T00:00:00Z') }),
+      D('2026-01-01T00:00:00Z'),
+      D('2026-03-01T00:00:00Z'),
+    );
+    expect(occs).toEqual([]);
+  });
+
   it('never returns occurrences before the event start and caps runaway expansion', () => {
     expect(
       expandOccurrences(ev({ recurrence: 'daily' }), D('2025-01-01T00:00:00Z'), D('2025-06-01T00:00:00Z')),

@@ -40,7 +40,8 @@ const calendarEventSchema = new mongoose.Schema(
 );
 calendarEventSchema.index({ startAt: 1 });
 calendarEventSchema.index({ kind: 1, officeId: 1 });
-calendarEventSchema.index({ resourceId: 1 });
+// Compound: serves the conflict-check query {resourceId, startAt: {$lt: horizon}}.
+calendarEventSchema.index({ resourceId: 1, startAt: 1 });
 
 export const CalendarEvent = mongoose.model('CalendarEvent', calendarEventSchema);
 export type CalendarEventDoc = InstanceType<typeof CalendarEvent>;
