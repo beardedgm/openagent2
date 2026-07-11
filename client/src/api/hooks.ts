@@ -49,11 +49,12 @@ export function useInvitations() {
   });
 }
 
-export function useNotifications() {
+// poll=false lets secondary consumers (the drawer) read the shared cache without adding another interval.
+export function useNotifications(poll = true) {
   return useQuery({
     queryKey: ['notifications'],
     queryFn: async () => (await api.get<NotificationsResponse>('/notifications')).data,
-    refetchInterval: 60_000, // keep the bell count fresh
+    refetchInterval: poll ? 60_000 : false, // keep the bell count fresh
   });
 }
 

@@ -36,6 +36,15 @@ describe('NotificationsDrawer', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('closes on Escape', async () => {
+    getMock.mockResolvedValue({ data: { notifications: [], unreadCount: 0, nextCursor: null } });
+    const onClose = vi.fn();
+    render(wrap(<NotificationsDrawer open onClose={onClose} />));
+    await screen.findByText(/all caught up/i);
+    await userEvent.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it('shows an empty state and a mark-all action', async () => {
     getMock.mockResolvedValue({ data: { notifications: [], unreadCount: 0, nextCursor: null } });
     render(wrap(<NotificationsDrawer open onClose={() => {}} />));
