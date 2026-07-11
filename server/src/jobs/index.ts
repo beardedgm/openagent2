@@ -1,5 +1,6 @@
 import type { Agenda, Job } from 'agenda';
 import { publishPostSideEffects } from '../services/postService.js';
+import { sweepEventReminders } from './eventReminders.js';
 import { pollAllFeeds } from './pollRss.js';
 
 export function registerJobs(agenda: Agenda): void {
@@ -9,5 +10,8 @@ export function registerJobs(agenda: Agenda): void {
   });
   agenda.define('poll-rss', async () => {
     await pollAllFeeds();
+  });
+  agenda.define('event-reminders', async () => {
+    await sweepEventReminders();
   });
 }

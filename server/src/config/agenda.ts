@@ -16,7 +16,8 @@ export async function startAgenda(registerJobs: (a: Agenda) => void): Promise<vo
   registerJobs(agenda);
   await agenda.start();
   await agenda.every('60 minutes', 'poll-rss');
-  logger.info('agenda started (poll-rss hourly)');
+  await agenda.every('15 minutes', 'event-reminders');
+  logger.info('agenda started (poll-rss hourly, event-reminders 15m)');
 }
 
 export async function stopAgenda(): Promise<void> {

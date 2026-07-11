@@ -69,3 +69,15 @@ export function mandatoryEventEmail(title: string, startAtIso: string, link: str
     </div>`,
   };
 }
+
+export function eventReminderEmail(title: string, startAtIso: string, link: string): { subject: string; html: string } {
+  const safeTitle = escapeHtml(title);
+  return {
+    subject: `Reminder: ${title}`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p>Upcoming event: <strong>${safeTitle}</strong></p>
+      <p>Starts at ${startAtIso} (shown in your local time on the calendar).</p>
+      <p><a href="${link}">View it on the calendar</a></p>
+    </div>`,
+  };
+}
