@@ -3,6 +3,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { Task, type TaskDoc, type TaskPriority } from '../models/Task.js';
 import { TaskTemplate } from '../models/TaskTemplate.js';
 import type { UserDoc } from '../models/User.js';
+import { addMonthsClamped } from '../utils/recurrence.js';
 import { htmlToText, sanitizePostHtml } from '../utils/sanitizeHtml.js';
 import { emitActivity } from './activityService.js';
 import { resolveAudience, type Audience } from './audience.js';
@@ -24,10 +25,7 @@ export interface TaskInput {
 function nextRecurrence(from: Date, recurrence: string): Date {
   if (recurrence === 'daily') return new Date(from.getTime() + 86_400_000);
   if (recurrence === 'weekly') return new Date(from.getTime() + 7 * 86_400_000);
-  // monthly: same wall-clock day next month, clamped by JS Date rollover being acceptable here
-  const d = new Date(from);
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  return d;
+  return addMonthsClamped(from, 1);
 }
 
 // createTask only needs the creator's id — the loose type lets template
@@ -101,18 +99,23 @@ export async function completeTask(
   const completion = task.completions.find((c) => String(c.userId) === targetUserId);
   if (!completion) throw new AppError(400, 'That user is not assigned to this task');
   if (completion.completedAt) throw new AppError(400, 'Task is already completed for that user');
-  completion.completedAt = new Date();
-  completion.note = note;
-  await task.save();
+  // Claim atomically so concurrent completes (double-click, retry) can't double-fire
+  // the activity + engagement side effects below.
+  const claimed = await Task.updateOne(
+    { _id: taskId, completions: { $elemMatch: { userId: targetUserId, completedAt: null } } },
+    { $set: { 'completions.$.completedAt': new Date(), 'completions.$.note': note, 'completions.$.completedBy': actor.id } },
+  );
+  if (claimed.matchedCount === 0) throw new AppError(400, 'Task is already completed for that user');
+  const onBehalf = targetUserId !== actor.id;
   await emitActivity({
     type: 'taskCompleted',
-    message: `You completed: ${task.title}`,
+    message: onBehalf ? `${task.title} was marked complete for you` : `You completed: ${task.title}`,
     link: `/tasks/${task.id}`,
-    userId: targetUserId, // visible only to the completer (PRD 5.2 "your own")
+    userId: targetUserId, // visible only to the assignee (PRD 5.2 "your own")
     actorId: actor.id,
   });
   logEngagement('taskComplete', targetUserId, { taskId: task.id });
-  return task;
+  return (await Task.findById(taskId))!;
 }
 
 export async function instantiateTemplate(

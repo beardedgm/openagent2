@@ -17,7 +17,7 @@ const DAY_MS = 86_400_000;
 const MAX_OCCURRENCES = 500;
 
 /** Adds n calendar months in UTC, clamping the day (Jan 31 + 1mo = Feb 28). */
-function addMonthsClamped(date: Date, n: number): Date {
+export function addMonthsClamped(date: Date, n: number): Date {
   const y = date.getUTCFullYear();
   const m = date.getUTCMonth() + n;
   const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();

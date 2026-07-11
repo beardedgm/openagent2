@@ -20,6 +20,8 @@ const completionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     completedAt: { type: Date, default: null },
+    // Records who marked it complete — the assignee themselves, or an admin on-behalf.
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     note: { type: String, default: '', maxlength: 1000 },
     // Sweeper latches (task-sweep job): set once per user when the notice went out.
     dueSoonNotifiedAt: { type: Date, default: null },

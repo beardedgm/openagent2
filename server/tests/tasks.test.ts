@@ -6,6 +6,7 @@ import { Task } from '../src/models/Task.js';
 import { TaskTemplate } from '../src/models/TaskTemplate.js';
 import { User } from '../src/models/User.js';
 import { resolveAudience } from '../src/services/audience.js';
+import { addMonthsClamped } from '../src/utils/recurrence.js';
 
 const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn(async () => true) }));
 vi.mock('../src/services/emailService.js', async (importOriginal) => ({
@@ -136,6 +137,10 @@ describe('taskService', () => {
     await completeTask(task.id, broker, 'verified in person', agent.id); // on-behalf
     const fresh = (await Task.findById(task.id))!;
     expect(fresh.completions[0].completedAt).not.toBeNull();
+    expect(String(fresh.completions[0].completedBy)).toBe(broker.id); // audit: who marked it
+    const act = (await ActivityEvent.findOne({ type: 'taskCompleted' }))!;
+    expect(act.message).toBe('X was marked complete for you'); // honest on-behalf copy
+    expect(String(act.userId)).toBe(agent.id); // still scoped to the assignee
   });
 
   it('instantiateTemplate creates one task per item with relative due dates', async () => {
@@ -157,5 +162,44 @@ describe('taskService', () => {
     expect(tasks[1].dueAt).toBeNull();
     expect(String(tasks[0].templateId)).toBe(tpl.id);
     expect(tasks[0].completions).toHaveLength(1);
+  });
+
+  it('addMonthsClamped clamps end-of-month days (Jan 31 + 1mo = Feb 28)', () => {
+    expect(addMonthsClamped(new Date('2026-01-31T10:00:00Z'), 1).toISOString()).toBe('2026-02-28T10:00:00.000Z');
+  });
+
+  it('Medium task due within 48h emails assignees', async () => {
+    const broker = await makeUser('t14@x.com', 'broker');
+    await makeUser('t15@x.com', 'agent');
+    await createTask(
+      { title: 'Soon', audience: { type: 'all' }, dueAt: new Date(Date.now() + 24 * 3_600_000).toISOString() },
+      broker,
+    );
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendEmailMock.mock.calls[0][0]).toBe('t15@x.com');
+  });
+
+  it('office-audience tasks emit an office-scoped feed event', async () => {
+    const officeA = '64b000000000000000000001';
+    const broker = await makeUser('t16@x.com', 'broker');
+    await makeUser('t17@x.com', 'agent', officeA);
+    await createTask({ title: 'Office chore', audience: { type: 'office', officeId: officeA } }, broker);
+    const act = (await ActivityEvent.findOne({ type: 'taskAssigned' }))!;
+    expect(String(act.officeId)).toBe(officeA);
+  });
+
+  it('non-admin cannot complete on behalf of another user', async () => {
+    const broker = await makeUser('t18@x.com', 'broker');
+    const agent = await makeUser('t19@x.com', 'agent');
+    const other = await makeUser('t20@x.com', 'agent');
+    const task = await createTask({ title: 'Y', audience: { type: 'users', userIds: [agent.id, other.id] } }, broker);
+    await expect(completeTask(task.id, other, '', agent.id)).rejects.toThrow(/permission/i);
+  });
+
+  it('users-audience tasks skip the feed entirely', async () => {
+    const broker = await makeUser('t21@x.com', 'broker');
+    const agent = await makeUser('t22@x.com', 'agent');
+    await createTask({ title: 'Direct', audience: { type: 'users', userIds: [agent.id] } }, broker);
+    expect(await ActivityEvent.countDocuments({ type: 'taskAssigned' })).toBe(0);
   });
 });
