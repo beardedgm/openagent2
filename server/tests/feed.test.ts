@@ -91,4 +91,21 @@ describe('feed', () => {
     expect(after.body.pinned).toHaveLength(0);
     expect(after.body.items).toHaveLength(2);
   });
+
+  it('user-scoped events show only to that user', async () => {
+    const app = createApp();
+    const alice = await loginAs(app, 'f7@x.com', 'agent');
+    const bob = await loginAs(app, 'f8@x.com', 'agent');
+    const aliceUser = (await User.findOne({ email: 'f7@x.com' }))!;
+    await ActivityEvent.create({ type: 'taskCompleted', message: 'You completed: File taxes', userId: aliceUser.id });
+    await ActivityEvent.create({ type: 'agentJoined', message: 'public event' });
+
+    const aliceFeed = await alice.get('/api/v1/feed');
+    expect(aliceFeed.body.items.map((i: { title: string }) => i.title).sort()).toEqual([
+      'You completed: File taxes',
+      'public event',
+    ]);
+    const bobFeed = await bob.get('/api/v1/feed');
+    expect(bobFeed.body.items.map((i: { title: string }) => i.title)).toEqual(['public event']);
+  });
 });

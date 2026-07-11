@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.716.0",
+    "@aws-sdk/s3-request-presigner": "^3.1085.0",
     "agenda": "^5.0.0",
     "connect-mongo": "^5.1.0",
     "dotenv": "^16.4.7",
