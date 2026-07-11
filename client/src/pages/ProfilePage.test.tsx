@@ -99,4 +99,14 @@ describe('ProfilePage', () => {
       expect.objectContaining({ emailPrefs: expect.objectContaining({ postPublished: false }) }),
     );
   });
+
+  it('unchecks the email preference optimistically before the server responds', async () => {
+    patchMock.mockImplementation(() => new Promise(() => {})); // never resolves
+
+    render(wrap());
+
+    const checkbox = await screen.findByRole('checkbox', { name: /important announcements/i });
+    await userEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked(); // optimistic — no server response yet
+  });
 });

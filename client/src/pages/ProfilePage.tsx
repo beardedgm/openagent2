@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useMe, useSettings, useUser } from '../api/hooks';
-import type { Role } from '../api/types';
+import type { Role, User } from '../api/types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -62,7 +62,16 @@ export function ProfilePage() {
 
   const updatePrefs = useMutation({
     mutationFn: (emailPrefs: Record<string, boolean>) => api.patch(`/users/${id}`, { emailPrefs }),
-    onSuccess: async () => {
+    onMutate: async (emailPrefs) => {
+      await qc.cancelQueries({ queryKey: ['users', id] });
+      const previous = qc.getQueryData<User>(['users', id]);
+      if (previous) qc.setQueryData<User>(['users', id], { ...previous, emailPrefs });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['users', id], ctx.previous);
+    },
+    onSettled: async () => {
       await qc.invalidateQueries({ queryKey: ['users', id] });
       await qc.invalidateQueries({ queryKey: ['me'] });
     },
@@ -88,6 +97,11 @@ export function ProfilePage() {
   const saveErrorMessage =
     updateUser.isError && isAxiosError(updateUser.error)
       ? ((updateUser.error.response?.data as { error?: string })?.error ?? 'Could not save changes')
+      : undefined;
+
+  const prefsErrorMessage =
+    updatePrefs.isError && isAxiosError(updatePrefs.error)
+      ? ((updatePrefs.error.response?.data as { error?: string })?.error ?? 'Could not save preferences')
       : undefined;
 
   if (isLoading) return <Spinner label="Loading profile" />;
@@ -263,6 +277,11 @@ export function ProfilePage() {
               {p.label}
             </label>
           ))}
+          {prefsErrorMessage && (
+            <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+              {prefsErrorMessage}
+            </p>
+          )}
         </Card>
       )}
     </div>
