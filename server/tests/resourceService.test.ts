@@ -6,8 +6,8 @@ import { Resource } from '../src/models/Resource.js';
 import { User } from '../src/models/User.js';
 import { announceResource, createResource, deleteResource, setFeatured, updateResource } from '../src/services/resourceService.js';
 
-async function makeUser(email: string, role = 'agent') {
-  return User.create({ email, hashedPassword: 'x', role, displayName: email });
+async function makeUser(email: string, role = 'agent', officeId: string | null = null) {
+  return User.create({ email, hashedPassword: 'x', role, displayName: email, officeId });
 }
 
 describe('resourceService', () => {
@@ -41,6 +41,26 @@ describe('resourceService', () => {
     await announceResource(r, broker.id); // what the upload route calls on FIRST version
     // no bookmarkers in this category → still zero notifications, but no crash
     expect(await Notification.countDocuments({ type: 'bookmarkedResource' })).toBe(0);
+  });
+
+  it('office-targeted resources announce only to bookmarkers who can see them', async () => {
+    const officeA = '64b000000000000000000001';
+    const officeB = '64b000000000000000000002';
+    const broker = await makeUser('rs9@x.com', 'broker');
+    const fanA = await makeUser('rs10@x.com', 'agent', officeA);
+    const fanB = await makeUser('rs11@x.com', 'agent', officeB);
+    const cat = await Category.create({ name: 'Marketing' });
+
+    // both fans follow the category via bookmarks on an existing all-users resource
+    const seed = await createResource({ title: 'Old kit', kind: 'link', externalUrl: 'https://a.example.com', categoryId: cat.id }, broker);
+    await Bookmark.create({ userId: fanA.id, resourceId: seed.id });
+    await Bookmark.create({ userId: fanB.id, resourceId: seed.id });
+    await Notification.deleteMany({});
+
+    await createResource({ title: 'Office A playbook', kind: 'link', externalUrl: 'https://b.example.com', categoryId: cat.id, officeId: officeA }, broker);
+    const notes = await Notification.find({ type: 'bookmarkedResource' });
+    expect(notes).toHaveLength(1);
+    expect(String(notes[0].userId)).toBe(fanA.id); // fanB cannot see the resource, so no bell/email
   });
 
   it('rejects a subcategory that is not a child of the chosen category', async () => {

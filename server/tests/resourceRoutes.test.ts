@@ -45,6 +45,11 @@ describe('resource routes', () => {
     await admin.post('/api/v1/resources').send({ title: 'Brand book', kind: 'link', externalUrl: 'https://b.example.com', categoryId: cat.id });
 
     expect((await admin.get('/api/v1/resources?q=objections')).body.resources).toHaveLength(1);
+    // $text also composes with the non-empty agent visibility filter
+    const agent = await loginAs(app, 'rr11@x.com', 'agent');
+    const agentSearch = await agent.get('/api/v1/resources?q=objections');
+    expect(agentSearch.status).toBe(200);
+    expect(agentSearch.body.resources).toHaveLength(1);
     expect((await admin.get(`/api/v1/resources?categoryId=${cat.id}`)).body.resources).toHaveLength(2); // parent includes child
     expect((await admin.get(`/api/v1/resources?categoryId=${sub.id}`)).body.resources).toHaveLength(1);
     expect((await admin.get('/api/v1/resources?fileType=link')).body.resources).toHaveLength(2);

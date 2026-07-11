@@ -2,7 +2,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { Bookmark } from '../models/Bookmark.js';
 import { Category } from '../models/Category.js';
 import { Resource, type ResourceDoc } from '../models/Resource.js';
-import type { UserDoc } from '../models/User.js';
+import { User, type UserDoc } from '../models/User.js';
 import { emitActivity } from './activityService.js';
 import { notify } from './notificationService.js';
 
@@ -35,9 +35,18 @@ async function assertCategoryPair(categoryId: string, subcategoryId?: string | n
  * — a file resource with no file yet is invisible to agents, so announcing it would 404. */
 export async function announceResource(resource: ResourceDoc, actorId: string): Promise<void> {
   const categoryPeers = await Resource.find({ categoryId: resource.categoryId, _id: { $ne: resource.id } }).distinct('_id');
-  const userIds = (await Bookmark.distinct('userId', { resourceId: { $in: categoryPeers } }))
+  let userIds = (await Bookmark.distinct('userId', { resourceId: { $in: categoryPeers } }))
     .map(String)
     .filter((id) => id !== actorId);
+  if (resource.officeId && userIds.length > 0) {
+    // Office-targeted resources must not announce outside their audience (PRD 5.6:
+    // agents see only resources they're authorized to access).
+    const audience = await User.find({
+      _id: { $in: userIds },
+      $or: [{ officeId: resource.officeId }, { role: { $in: ['broker', 'officeAdmin'] } }],
+    }).distinct('_id');
+    userIds = audience.map(String);
+  }
   const category = await Category.findById(resource.categoryId);
   await notify(
     userIds,
