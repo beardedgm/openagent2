@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { DirectoryPage } from './pages/DirectoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { PostEditorPage } from './pages/PostEditorPage';
+import { PostPage } from './pages/PostPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
@@ -35,6 +36,7 @@ export function App() {
             </RequireAuth>
           }
         />
+        <Route path="/board/:id" element={<PostPage />} />
         <Route
           path="/board/:id/edit"
           element={
