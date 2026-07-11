@@ -106,8 +106,9 @@ export function SettingsPage() {
 
   const hexIsValid = HEX_PATTERN.test(primaryColor);
   const hasEmptyOfficeName = offices.some((o) => !o.name.trim());
+  const hasEmptyResourceName = resources.some((r) => !r.name.trim());
   const hasInvalidFeedUrl = rssFeeds.some((f) => !/^https?:\/\//i.test(f.trim()));
-  const canSave = hexIsValid && !hasEmptyOfficeName && !hasInvalidFeedUrl && !save.isPending;
+  const canSave = hexIsValid && !hasEmptyOfficeName && !hasEmptyResourceName && !hasInvalidFeedUrl && !save.isPending;
 
   function updateOffice(index: number, patch: Partial<OfficeRow>) {
     setOffices((prev) => prev.map((o, i) => (i === index ? { ...o, ...patch } : o)));
@@ -181,13 +182,15 @@ export function SettingsPage() {
           Saved
         </p>
       )}
-      {(hasEmptyOfficeName || hasInvalidFeedUrl || !hexIsValid) && (
+      {(hasEmptyOfficeName || hasEmptyResourceName || hasInvalidFeedUrl || !hexIsValid) && (
         <p style={{ color: 'var(--color-warning)', fontSize: 13 }}>
           {hasEmptyOfficeName
             ? 'Every office needs a name before you can save.'
-            : hasInvalidFeedUrl
-              ? 'Every feed URL must start with http:// or https:// before you can save.'
-              : 'The primary color must be a valid hex value before you can save.'}
+            : hasEmptyResourceName
+              ? 'Every resource needs a name before you can save.'
+              : hasInvalidFeedUrl
+                ? 'Every feed URL must start with http:// or https:// before you can save.'
+                : 'The primary color must be a valid hex value before you can save.'}
         </p>
       )}
 

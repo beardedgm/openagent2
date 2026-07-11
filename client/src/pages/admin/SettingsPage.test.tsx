@@ -37,7 +37,7 @@ const serverSettings = {
   welcomeMessage: '',
   quickLinks: [],
   homepageLayout: [],
-  reservableResources: [],
+  reservableResources: [{ _id: 'r1', name: 'Conference Room A' }],
   onboardingTaskTemplateId: null,
 };
 
@@ -101,6 +101,18 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(patchMock).toHaveBeenCalledTimes(2));
     const secondBody = patchMock.mock.calls[1][1];
     expect(secondBody.officeLocations[1]).toMatchObject({ _id: 'off2-minted', name: 'Branch Renamed' });
+  });
+
+  it('echoes reservable resource _ids back on save so event references never dangle', async () => {
+    render(wrap());
+
+    expect(await screen.findByLabelText('Resource 1 name')).toHaveValue('Conference Room A');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await screen.findByText('Saved');
+    const body = patchMock.mock.calls[0][1];
+    expect(body.reservableResources[0]).toMatchObject({ _id: 'r1', name: 'Conference Room A' });
   });
 
   it('blocks Save with a hint while the hex color is invalid', async () => {
