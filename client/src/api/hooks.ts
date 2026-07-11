@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Invitation, NotificationsResponse, PublicSettings, Settings, User } from './types';
+import type { Invitation, NotificationsResponse, Post, PostComment, PublicSettings, Settings, User } from './types';
 
 export function useMe() {
   return useQuery({
@@ -55,6 +55,32 @@ export function useNotifications(poll = true) {
     queryKey: ['notifications'],
     queryFn: async () => (await api.get<NotificationsResponse>('/notifications')).data,
     refetchInterval: poll ? 60_000 : false, // keep the bell count fresh
+  });
+}
+
+export function usePosts(q: string, page: number) {
+  return useQuery({
+    queryKey: ['posts', { q, page }],
+    queryFn: async () =>
+      (await api.get<{ posts: Post[]; total: number; page: number }>(
+        `/posts?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
+      )).data,
+  });
+}
+
+export function usePost(id: string | undefined) {
+  return useQuery({
+    queryKey: ['posts', id],
+    queryFn: async () => (await api.get<{ post: Post }>(`/posts/${id}`)).data.post,
+    enabled: !!id,
+  });
+}
+
+export function useComments(postId: string | undefined) {
+  return useQuery({
+    queryKey: ['posts', postId, 'comments'],
+    queryFn: async () => (await api.get<{ comments: PostComment[] }>(`/posts/${postId}/comments`)).data.comments,
+    enabled: !!postId,
   });
 }
 

@@ -61,3 +61,30 @@ export interface NotificationsResponse {
   unreadCount: number;
   nextCursor: string | null;
 }
+
+export interface PostAuthor {
+  id: string;
+  displayName: string;
+  photoUrl: string;
+}
+
+export interface Post {
+  id: string;
+  title: string;
+  bodyHtml: string;
+  excerpt: string;
+  author: PostAuthor | null;
+  officeId: string | null;
+  important: boolean;
+  commentsEnabled: boolean;
+  pinnedAt: string | null;
+  publishAt: string;
+  createdAt: string;
+}
+
+export interface PostComment {
+  id: string;
+  body: string;
+  author: PostAuthor | null;
+  createdAt: string;
+}

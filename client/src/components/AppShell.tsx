@@ -1,4 +1,4 @@
-import { Bell, LayoutDashboard, LogOut, Menu, Settings, UserSquare, Users } from 'lucide-react';
+import { Bell, LayoutDashboard, LogOut, Megaphone, Menu, Settings, UserSquare, Users } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -80,6 +80,10 @@ export function AppShell() {
           <NavLink to="/directory" style={({ isActive }) => navLinkStyle(isActive)}>
             <UserSquare size={18} />
             Directory
+          </NavLink>
+          <NavLink to="/board" style={({ isActive }) => navLinkStyle(isActive)}>
+            <Megaphone size={18} />
+            Message Board
           </NavLink>
           {isAdmin && (
             <>
