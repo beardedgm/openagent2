@@ -50,7 +50,7 @@ const taskSchema = new mongoose.Schema(
     dueAt: { type: Date, default: null },
     attachments: { type: [attachmentSchema], default: [] },
     // Field ships per PRD 5.7; the Resource Hub (and its UI) arrives in Stage 4.
-    relatedResourceId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    relatedResourceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resource', default: null },
     recurrence: { type: String, enum: RECURRENCE, default: 'none' },
     // Sweeper claims this atomically to spawn the next instance.
     nextRecurrenceAt: { type: Date, default: null },
@@ -81,6 +81,7 @@ export function toPublicTask(t: TaskDoc, viewerId: string) {
     priority: t.priority,
     dueAt: t.dueAt,
     attachments: t.attachments.map((a) => ({ name: a.name, size: a.size, contentType: a.contentType })),
+    relatedResourceId: t.relatedResourceId ? String(t.relatedResourceId) : null,
     recurrence: t.recurrence,
     isOnboarding: t.isOnboarding,
     myCompletion: mine ? { completedAt: mine.completedAt, note: mine.note } : null,

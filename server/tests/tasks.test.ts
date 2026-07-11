@@ -277,4 +277,29 @@ describe('task routes', () => {
     expect((await broker.delete(`/api/v1/task-templates/${id}`)).status).toBe(200);
     expect((await broker.get('/api/v1/task-templates')).body.templates).toHaveLength(0);
   });
+
+  it('round-trips relatedResourceId through create and toPublicTask', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'tr8@x.com', 'officeAdmin');
+    const cat = (await admin.post('/api/v1/categories').send({ name: 'TaskDocs' })).body.category;
+    const resource = (
+      await admin
+        .post('/api/v1/resources')
+        .send({ title: 'Checklist', kind: 'link', externalUrl: 'https://a.example.com', categoryId: cat.id })
+    ).body.resource;
+    const created = await admin.post('/api/v1/tasks').send({
+      title: 'Read the checklist',
+      audience: { type: 'all' },
+      relatedResourceId: resource.id,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.task.relatedResourceId).toBe(resource.id);
+    // A well-formed but nonexistent resource id is rejected pre-create.
+    const missing = await admin.post('/api/v1/tasks').send({
+      title: 'Broken link',
+      audience: { type: 'all' },
+      relatedResourceId: '64b0000000000000000000ff',
+    });
+    expect(missing.status).toBe(400);
+  });
 });
