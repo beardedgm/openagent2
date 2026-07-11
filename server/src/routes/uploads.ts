@@ -54,3 +54,14 @@ uploadsRouter.post(
     res.json({ url });
   }),
 );
+
+uploadsRouter.post(
+  '/banner-image',
+  requireRole('officeAdmin'),
+  upload.single('file'),
+  asyncHandler(async (req, res) => {
+    const file = requireImage(req.file);
+    const url = await storage.putPublic(makeKey('banners', file.mimetype), file.buffer, file.mimetype);
+    res.json({ url });
+  }),
+);
