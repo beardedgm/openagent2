@@ -2,6 +2,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { Bookmark } from '../models/Bookmark.js';
 import { Category } from '../models/Category.js';
 import { Resource, type ResourceDoc } from '../models/Resource.js';
+import { Task } from '../models/Task.js';
 import { User, type UserDoc } from '../models/User.js';
 import { emitActivity } from './activityService.js';
 import { notify } from './notificationService.js';
@@ -118,5 +119,8 @@ export async function deleteResource(id: string): Promise<void> {
   const resource = await Resource.findById(id);
   if (!resource) throw new AppError(404, 'Resource not found');
   await Bookmark.deleteMany({ resourceId: resource.id });
+  // Clear dangling task links — a dangling relatedResourceId would 400 the existence
+  // guard in createTask and silently kill future recurring-task spawns.
+  await Task.updateMany({ relatedResourceId: resource.id }, { $set: { relatedResourceId: null } });
   await resource.deleteOne();
 }

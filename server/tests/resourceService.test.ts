@@ -3,6 +3,7 @@ import { Bookmark } from '../src/models/Bookmark.js';
 import { Category } from '../src/models/Category.js';
 import { Notification } from '../src/models/Notification.js';
 import { Resource } from '../src/models/Resource.js';
+import { Task } from '../src/models/Task.js';
 import { User } from '../src/models/User.js';
 import { announceResource, createResource, deleteResource, setFeatured, updateResource } from '../src/services/resourceService.js';
 
@@ -97,8 +98,15 @@ describe('resourceService', () => {
     expect(String(updated.subcategoryId)).toBe(sub.id);
 
     await Bookmark.create({ userId: fan.id, resourceId: r.id });
+    const task = await Task.create({
+      title: 'Read Doc',
+      createdBy: broker.id,
+      audience: { type: 'users', userIds: [fan.id], officeId: null },
+      relatedResourceId: r.id,
+    });
     await deleteResource(r.id);
     expect(await Resource.countDocuments()).toBe(0);
     expect(await Bookmark.countDocuments()).toBe(0);
+    expect((await Task.findById(task.id))!.relatedResourceId).toBeNull(); // link cleared, not left dangling
   });
 });
