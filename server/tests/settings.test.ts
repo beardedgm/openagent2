@@ -64,5 +64,19 @@ describe('settings', () => {
     expect(res.body.settings.reservableResources).toHaveLength(2);
     expect(res.body.settings.reservableResources[0].name).toBe('Conference Room A');
     expect(res.body.settings.reservableResources[0]._id).toBeTruthy(); // events reference this id
+
+    // Round-trip: echoed _ids must survive an edit — calendar events reference them,
+    // so regenerating ids on every admin save would dangle those references.
+    const firstId = res.body.settings.reservableResources[0]._id;
+    const secondId = res.body.settings.reservableResources[1]._id;
+    const edited = await broker.patch('/api/v1/admin/settings').send({
+      reservableResources: [
+        { _id: firstId, name: 'Conference Room A' },
+        { _id: secondId, name: 'Training Room B' },
+      ],
+    });
+    expect(edited.status).toBe(200);
+    expect(edited.body.settings.reservableResources[0]._id).toBe(firstId);
+    expect(edited.body.settings.reservableResources[1].name).toBe('Training Room B');
   });
 });

@@ -6,6 +6,7 @@ const officeSchema = new mongoose.Schema({
   timezone: { type: String, default: 'America/Chicago' },
 });
 
+// Calendar events reference these subdoc _ids; clients must echo _id back on edit or references dangle. Deletion policy: resources are removable — conflict checks only guard live events (see calendarService).
 const reservableResourceSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 80 },
 });
