@@ -1,21 +1,43 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env.js';
+
+/** Where a protected download lives: a presigned URL (R2) or a disk path to stream (local). */
+export type DownloadTarget = { kind: 'url'; url: string } | { kind: 'file'; path: string };
 
 export interface StoragePort {
   putPublic(key: string, body: Buffer, contentType: string): Promise<string>;
+  /** Stores a protected file. Returns the storage key — protected files have no public URL. */
+  putPrivate(key: string, body: Buffer, contentType: string): Promise<string>;
+  /** Resolves a protected key for download. R2: 15-minute presigned GET. Local: disk path. */
+  resolveDownload(key: string): Promise<DownloadTarget>;
 }
 
 export const LOCAL_UPLOAD_DIR = join(process.cwd(), 'uploads');
+const SIGNED_URL_TTL_SECONDS = 15 * 60; // spec §3: 15-minute expiry
 
 class LocalStorage implements StoragePort {
   async putPublic(key: string, body: Buffer): Promise<string> {
+    await this.write(key, body);
+    return `/files/${key}`;
+  }
+
+  async putPrivate(key: string, body: Buffer): Promise<string> {
+    await this.write(key, body);
+    return key;
+  }
+
+  async resolveDownload(key: string): Promise<DownloadTarget> {
+    return { kind: 'file', path: join(LOCAL_UPLOAD_DIR, key) };
+  }
+
+  private async write(key: string, body: Buffer): Promise<void> {
     const path = join(LOCAL_UPLOAD_DIR, key);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, body);
-    return `/files/${key}`;
   }
 }
 
@@ -35,6 +57,22 @@ class R2Storage implements StoragePort {
     );
     return `${env.R2_PUBLIC_BASE_URL}/${key}`;
   }
+
+  async putPrivate(key: string, body: Buffer, contentType: string): Promise<string> {
+    await this.client.send(
+      new PutObjectCommand({ Bucket: env.R2_BUCKET, Key: key, Body: body, ContentType: contentType }),
+    );
+    return key;
+  }
+
+  async resolveDownload(key: string): Promise<DownloadTarget> {
+    const url = await getSignedUrl(
+      this.client,
+      new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key }),
+      { expiresIn: SIGNED_URL_TTL_SECONDS },
+    );
+    return { kind: 'url', url };
+  }
 }
 
 export const storage: StoragePort = env.STORAGE_DRIVER === 'r2' ? new R2Storage() : new LocalStorage();
@@ -48,4 +86,11 @@ const EXT_BY_TYPE: Record<string, string> = {
 export function makeKey(prefix: string, contentType: string): string {
   const ext = EXT_BY_TYPE[contentType] ?? 'bin';
   return `${prefix}/${randomBytes(12).toString('hex')}.${ext}`;
+}
+
+/** Protected-file key: private/<scope>/<random>/<sanitized original name>. The original
+ * name is kept (sanitized) so downloads can carry a human filename. */
+export function makeAttachmentKey(scope: string, originalName: string): string {
+  const safe = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.\.+/g, '_').slice(-80) || 'file';
+  return `private/${scope}/${randomBytes(12).toString('hex')}/${safe}`;
 }
