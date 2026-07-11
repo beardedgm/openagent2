@@ -5,11 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { PostEditorPage } from './PostEditorPage';
 
-const { getMock, postMock } = vi.hoisted(() => ({
+const { getMock, postMock, patchMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
   postMock: vi.fn(),
+  patchMock: vi.fn(),
 }));
-vi.mock('../api/client', () => ({ api: { get: getMock, post: postMock, patch: vi.fn() } }));
+vi.mock('../api/client', () => ({ api: { get: getMock, post: postMock, patch: patchMock } }));
 
 vi.mock('../components/RichTextEditor', () => ({
   RichTextEditor: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
@@ -110,5 +111,41 @@ describe('PostEditorPage', () => {
       '/posts',
       expect.objectContaining({ title: 'New title' }),
     );
+  });
+
+  it('publishes now when the schedule is cleared on a scheduled post', async () => {
+    const scheduledPost = {
+      id: 'p1',
+      title: 'Scheduled post',
+      bodyHtml: '<p>later</p>',
+      excerpt: '',
+      author: { id: 'u1', displayName: 'Admin', photoUrl: '' },
+      officeId: null,
+      important: false,
+      commentsEnabled: true,
+      pinnedAt: null,
+      publishAt: new Date(Date.now() + 86_400_000).toISOString(), // in the future
+      createdAt: new Date().toISOString(),
+    };
+    getMock.mockImplementation(async (url: string) => {
+      if (url === '/auth/me') return { data: { user: me } };
+      if (url === '/settings') return { data: { settings } };
+      if (url === '/posts/p1') return { data: { post: scheduledPost } };
+      throw new Error(`Unhandled GET ${url}`);
+    });
+    patchMock.mockResolvedValue({ data: { post: scheduledPost } });
+
+    render(wrap('/board/p1/edit', '/board/:id/edit'));
+
+    const scheduleInput = await screen.findByLabelText('Schedule (leave empty to publish now)');
+    expect(scheduleInput).not.toHaveValue(''); // seeded with the future schedule
+    await userEvent.clear(scheduleInput);
+    await userEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+    expect(patchMock).toHaveBeenCalledTimes(1);
+    const [url, body] = patchMock.mock.calls[0] as [string, { publishAt?: string }];
+    expect(url).toBe('/posts/p1');
+    expect(typeof body.publishAt).toBe('string');
+    expect(new Date(body.publishAt!).getTime()).toBeLessThanOrEqual(Date.now() + 60_000); // "now", not the old future date
   });
 });

@@ -32,7 +32,22 @@ export function PostEditorPage() {
   const [important, setImportant] = useState(false);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [publishAt, setPublishAt] = useState(''); // datetime-local value; '' = publish now
+  const [wasScheduled, setWasScheduled] = useState(false); // post had a future publishAt when seeded
   const [seeded, setSeeded] = useState(false);
+
+  // React Router does not remount this page across /board/:id/edit → /board/new (same element),
+  // so reset the form (and the seeding latch) whenever the edited post changes. Declared before
+  // the seeding effect so on an id change the reset applies first and the seed re-runs cleanly.
+  useEffect(() => {
+    setSeeded(false);
+    setTitle('');
+    setBodyHtml('');
+    setOfficeId('');
+    setImportant(false);
+    setCommentsEnabled(true);
+    setPublishAt('');
+    setWasScheduled(false);
+  }, [id]);
 
   useEffect(() => {
     if (editing && existing && !seeded) {
@@ -41,7 +56,10 @@ export function PostEditorPage() {
       setOfficeId(existing.officeId ?? '');
       setImportant(existing.important);
       setCommentsEnabled(existing.commentsEnabled);
-      if (new Date(existing.publishAt) > new Date()) setPublishAt(toLocalInputValue(existing.publishAt));
+      if (new Date(existing.publishAt) > new Date()) {
+        setPublishAt(toLocalInputValue(existing.publishAt));
+        setWasScheduled(true);
+      }
       setSeeded(true);
     }
   }, [editing, existing, seeded]);
@@ -54,7 +72,11 @@ export function PostEditorPage() {
         officeId: officeId || null,
         important,
         commentsEnabled,
-        ...(publishAt ? { publishAt: new Date(publishAt).toISOString() } : {}),
+        ...(publishAt
+          ? { publishAt: new Date(publishAt).toISOString() }
+          : editing && wasScheduled
+            ? { publishAt: new Date().toISOString() } // cleared schedule on a scheduled post = publish now
+            : {}),
       };
       const res = editing
         ? await api.patch<{ post: Post }>(`/posts/${id}`, body)
