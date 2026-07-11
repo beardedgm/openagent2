@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { RequireAuth } from './components/RequireAuth';
 import { BoardPage } from './pages/BoardPage';
+import { CalendarPage } from './pages/CalendarPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DirectoryPage } from './pages/DirectoryPage';
 import { FeedPage } from './pages/FeedPage';
@@ -47,6 +48,7 @@ export function App() {
           }
         />
         <Route path="/feed" element={<FeedPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
         <Route
           path="/admin/users"
           element={
