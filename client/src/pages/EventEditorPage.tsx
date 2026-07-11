@@ -257,6 +257,11 @@ export function EventEditorPage() {
               if (checked) {
                 setStartAt((v) => v.slice(0, 10));
                 setEndAt((v) => v.slice(0, 10));
+              } else {
+                // Back to datetime-local, which can't render a date-only value (the fields
+                // would blank): append arbitrary default times — the user adjusts.
+                setStartAt((v) => (v ? `${v.slice(0, 10)}T09:00` : v));
+                setEndAt((v) => (v ? `${v.slice(0, 10)}T10:00` : v));
               }
             }}
             style={{ width: 18, height: 18 }}

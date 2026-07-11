@@ -374,4 +374,19 @@ describe('event routes', () => {
     const agent = await loginAs(app, 'r12@x.com', 'agent');
     expect((await agent.get('/api/v1/events?from[0]=2026-01-01&to=2026-01-02')).status).toBe(400);
   });
+
+  it('an officeAdmin can edit a mandatory event but not change the flag', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'r13@x.com', 'broker');
+    const admin = await loginAs(app, 'r14@x.com', 'officeAdmin');
+    const created = await broker.post('/api/v1/events').send({
+      title: 'All hands', kind: 'office', mandatory: true,
+      startAt: '2026-08-06T15:00:00.000Z', endAt: '2026-08-06T16:00:00.000Z',
+    });
+    const id = created.body.event.id;
+    const renamed = await admin.patch(`/api/v1/events/${id}`).send({ title: 'All hands (moved rooms)' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.event.title).toBe('All hands (moved rooms)');
+    expect((await admin.patch(`/api/v1/events/${id}`).send({ mandatory: false })).status).toBe(403);
+  });
 });

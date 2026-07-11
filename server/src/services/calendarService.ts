@@ -97,7 +97,7 @@ function applyInput(event: CalendarEventDoc, input: EventInput): void {
   if (input.resourceId !== undefined) event.resourceId = (input.resourceId ?? null) as never;
 }
 
-function enforceKindRules(event: CalendarEventDoc, user: UserDoc): void {
+function enforceKindRules(event: CalendarEventDoc): void {
   if (event.endAt <= event.startAt) throw new AppError(400, 'Event must end after it starts');
   // Guards updates too (the create validator already rejects this): an until before
   // start yields zero occurrences, silently vanishing the event from the calendar.
@@ -109,15 +109,18 @@ function enforceKindRules(event: CalendarEventDoc, user: UserDoc): void {
     event.mandatory = false;
     event.rsvpEnabled = false;
     event.resourceId = null as never;
-  } else if (event.mandatory && user.role !== 'broker') {
-    throw new AppError(403, 'Only a broker can mark events mandatory');
   }
+  // The mandatory flag is broker-gated at the TRANSITION points (createEvent/updateEvent), not
+  // here: gating on the current value would 403 any non-broker save of an event that is (still)
+  // mandatory — e.g. an officeAdmin fixing a typo on a broker's mandatory all-hands.
 }
 
 export async function createEvent(input: EventInput, creator: UserDoc): Promise<CalendarEventDoc> {
   const event = new CalendarEvent({ kind: input.kind, createdBy: creator.id, title: input.title, startAt: new Date(0), endAt: new Date(0) });
   applyInput(event, input);
-  enforceKindRules(event, creator);
+  enforceKindRules(event);
+  if (event.kind === 'office' && event.mandatory && creator.role !== 'broker')
+    throw new AppError(403, 'Only a broker can mark events mandatory');
   if (event.resourceId) {
     await assertResourceExists(String(event.resourceId));
     // Check-then-save race: two simultaneous saves can both pass this check (same accepted
@@ -136,7 +139,10 @@ export async function updateEvent(id: string, input: EventInput, user: UserDoc):
   if (!canManage(event, user)) throw new AppError(403, 'Insufficient permissions');
   const wasMandatory = event.mandatory;
   applyInput(event, input);
-  enforceKindRules(event, user);
+  enforceKindRules(event);
+  // Changing the flag either direction is broker-only; leaving it as-is is fine for any manager.
+  if (event.kind === 'office' && event.mandatory !== wasMandatory && user.role !== 'broker')
+    throw new AppError(403, 'Only a broker can change the mandatory flag');
   // Existence is re-validated only when the caller changes the resource — an event holding
   // a since-removed resource must stay editable (Settings documents resources as removable).
   // The conflict re-check still runs on ANY edit (time moves can create new overlaps).
