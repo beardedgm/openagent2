@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useMe, useSettings, useUser } from '../api/hooks';
-import type { Role } from '../api/types';
+import type { Role, User } from '../api/types';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -26,6 +26,11 @@ const ROLE_TONE: Record<Role, 'accent' | 'success' | 'neutral'> = {
   tc: 'neutral',
   external: 'neutral',
 };
+
+const EMAIL_PREFS: { key: string; label: string; adminOnly?: boolean }[] = [
+  { key: 'postPublished', label: 'Important announcements' },
+  { key: 'invitationAccepted', label: 'An invitation I sent is accepted', adminOnly: true },
+];
 
 export function ProfilePage() {
   const { id } = useParams();
@@ -55,6 +60,23 @@ export function ProfilePage() {
     },
   });
 
+  const updatePrefs = useMutation({
+    mutationFn: (emailPrefs: Record<string, boolean>) => api.patch(`/users/${id}`, { emailPrefs }),
+    onMutate: async (emailPrefs) => {
+      await qc.cancelQueries({ queryKey: ['users', id] });
+      const previous = qc.getQueryData<User>(['users', id]);
+      if (previous) qc.setQueryData<User>(['users', id], { ...previous, emailPrefs });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['users', id], ctx.previous);
+    },
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: ['users', id] });
+      await qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+
   const uploadAvatar = useMutation({
     mutationFn: (file: File) => {
       const formData = new FormData();
@@ -75,6 +97,11 @@ export function ProfilePage() {
   const saveErrorMessage =
     updateUser.isError && isAxiosError(updateUser.error)
       ? ((updateUser.error.response?.data as { error?: string })?.error ?? 'Could not save changes')
+      : undefined;
+
+  const prefsErrorMessage =
+    updatePrefs.isError && isAxiosError(updatePrefs.error)
+      ? ((updatePrefs.error.response?.data as { error?: string })?.error ?? 'Could not save preferences')
       : undefined;
 
   if (isLoading) return <Spinner label="Loading profile" />;
@@ -227,6 +254,34 @@ export function ProfilePage() {
               </Button>
             </div>
           </form>
+        </Card>
+      )}
+
+      {isSelf && me && (
+        <Card>
+          <h2 style={{ fontSize: 18, marginBottom: 'var(--space-2)' }}>Email notifications</h2>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 'var(--space-3)' }}>
+            In-app notifications are always on. Choose which ones also send an email.
+          </p>
+          {EMAIL_PREFS.filter((p) => !p.adminOnly || me.role === 'broker' || me.role === 'officeAdmin').map((p) => (
+            <label
+              key={p.key}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44, fontSize: 14 }}
+            >
+              <input
+                type="checkbox"
+                checked={user.emailPrefs[p.key] ?? true}
+                onChange={(e) => updatePrefs.mutate({ ...user.emailPrefs, [p.key]: e.target.checked })}
+                style={{ width: 18, height: 18 }}
+              />
+              {p.label}
+            </label>
+          ))}
+          {prefsErrorMessage && (
+            <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+              {prefsErrorMessage}
+            </p>
+          )}
         </Card>
       )}
     </div>

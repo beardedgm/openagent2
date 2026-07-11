@@ -46,3 +46,61 @@ export interface Invitation {
   officeId: string | null;
   expiresAt: string;
 }
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  link: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+}
+
+export interface PostAuthor {
+  id: string;
+  displayName: string;
+  photoUrl: string;
+}
+
+export interface Post {
+  id: string;
+  title: string;
+  bodyHtml: string;
+  excerpt: string;
+  author: PostAuthor | null;
+  officeId: string | null;
+  important: boolean;
+  commentsEnabled: boolean;
+  pinnedAt: string | null;
+  publishAt: string;
+  createdAt: string;
+}
+
+export interface PostComment {
+  id: string;
+  body: string;
+  author: PostAuthor | null;
+  createdAt: string;
+}
+
+export interface FeedItem {
+  id: string;
+  kind: 'internal' | 'external';
+  title: string;
+  link: string;
+  source?: string;
+  pinnedUntil?: string | null;
+  date: string;
+}
+
+export interface FeedResponse {
+  pinned: FeedItem[];
+  items: FeedItem[];
+  nextCursor: string | null;
+}

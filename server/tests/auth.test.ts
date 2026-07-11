@@ -1,10 +1,22 @@
 import { createHash } from 'node:crypto';
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app.js';
+import { ActivityEvent } from '../src/models/ActivityEvent.js';
 import { Invitation } from '../src/models/Invitation.js';
+import { Notification } from '../src/models/Notification.js';
 import { User } from '../src/models/User.js';
 import { hashPassword } from '../src/utils/password.js';
+
+const { notifyMock } = vi.hoisted(() => ({ notifyMock: vi.fn() }));
+// Spread the original module and delegate to the real notify by default so the
+// happy-path registration test still creates real Notification docs; individual
+// tests can queue a one-shot rejection to exercise the failure path.
+vi.mock('../src/services/notificationService.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../src/services/notificationService.js')>();
+  notifyMock.mockImplementation(original.notify);
+  return { ...original, notify: notifyMock };
+});
 
 async function makeUser(email: string, role = 'agent', status = 'active') {
   return User.create({
@@ -129,4 +141,62 @@ describe('auth', () => {
     }
     expect(last).toBe(429);
   }, 20000);
+
+  it('registration notifies the inviting admin and emits an agentJoined event', async () => {
+    const app = createApp();
+    const admin = await User.create({
+      email: 'inviter@x.com',
+      hashedPassword: await hashPassword('Password1!'),
+      role: 'broker',
+      displayName: 'Inviter',
+    });
+    const token = 'stage2-test-token';
+    await Invitation.create({
+      email: 'newagent@x.com',
+      role: 'agent',
+      invitedBy: admin.id,
+      tokenHash: createHash('sha256').update(token).digest('hex'),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({ token, password: 'Password1!', displayName: 'New Agent' });
+    expect(res.status).toBe(201);
+
+    const notifications = await Notification.find({ userId: admin.id });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].type).toBe('invitationAccepted');
+    expect(notifications[0].title).toContain('New Agent');
+    const events = await ActivityEvent.find({ type: 'agentJoined' });
+    expect(events).toHaveLength(1);
+    expect(events[0].message).toContain('New Agent');
+  });
+
+  it('registration succeeds even when a post-registration side effect fails', async () => {
+    const app = createApp();
+    const admin = await User.create({
+      email: 'inviter2@x.com',
+      hashedPassword: await hashPassword('Password1!'),
+      role: 'broker',
+      displayName: 'Inviter Two',
+    });
+    const token = 'stage2-resilience-token';
+    await Invitation.create({
+      email: 'resilient@x.com',
+      role: 'agent',
+      invitedBy: admin.id,
+      tokenHash: createHash('sha256').update(token).digest('hex'),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    notifyMock.mockRejectedValueOnce(new Error('notification pipeline down'));
+
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .send({ token, password: 'Password1!', displayName: 'Resilient Agent' });
+    expect(res.status).toBe(201);
+    expect(await User.findOne({ email: 'resilient@x.com' })).not.toBeNull();
+    // Proves the rejection actually fired: the failed notify created no docs.
+    expect(await Notification.find({ userId: admin.id })).toHaveLength(0);
+  });
 });

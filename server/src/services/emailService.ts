@@ -33,3 +33,27 @@ export function invitationEmail(brandName: string, link: string): { subject: str
     </div>`,
   };
 }
+
+export function invitationAcceptedEmail(displayName: string, profileLink: string): { subject: string; html: string } {
+  const safeName = escapeHtml(displayName);
+  return {
+    // Subject is a plain-text header, not HTML — use the raw name.
+    subject: `${displayName} accepted your invitation`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p><strong>${safeName}</strong> accepted your invitation and joined the workspace.</p>
+      <p><a href="${profileLink}">View their profile</a></p>
+    </div>`,
+  };
+}
+
+export function importantPostEmail(title: string, link: string): { subject: string; html: string } {
+  const safeTitle = escapeHtml(title);
+  return {
+    subject: `Important announcement: ${title}`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p>An important announcement was posted to your workspace:</p>
+      <p><strong>${safeTitle}</strong></p>
+      <p><a href="${link}">Read it on the message board</a></p>
+    </div>`,
+  };
+}

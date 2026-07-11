@@ -1,14 +1,21 @@
 import { createApp } from './app.js';
+import { startAgenda, stopAgenda } from './config/agenda.js';
 import { connectDb } from './config/db.js';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
+import { registerJobs } from './jobs/index.js';
 
 async function start(): Promise<void> {
   await connectDb();
+  await startAgenda(registerJobs);
   if (env.NODE_ENV === 'production' && !env.TURNSTILE_SECRET_KEY)
     logger.warn('TURNSTILE_SECRET_KEY not set — bot protection is disabled in production');
   const app = createApp();
   app.listen(env.PORT, () => logger.info(`listening on :${env.PORT}`));
+
+  process.on('SIGTERM', () => {
+    void stopAgenda().finally(() => process.exit(0));
+  });
 }
 
 start().catch((err) => {

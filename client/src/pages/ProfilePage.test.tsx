@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfilePage } from './ProfilePage';
@@ -85,5 +86,27 @@ describe('ProfilePage', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Phone number is invalid');
+  });
+
+  it('toggles an email preference off on own profile', async () => {
+    render(wrap()); // me.id === viewed id ('u1') → own profile
+
+    const checkbox = await screen.findByRole('checkbox', { name: /important announcements/i });
+    expect(checkbox).toBeChecked(); // absent pref defaults to on
+    await userEvent.click(checkbox);
+    expect(patchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/users\//),
+      expect.objectContaining({ emailPrefs: expect.objectContaining({ postPublished: false }) }),
+    );
+  });
+
+  it('unchecks the email preference optimistically before the server responds', async () => {
+    patchMock.mockImplementation(() => new Promise(() => {})); // never resolves
+
+    render(wrap());
+
+    const checkbox = await screen.findByRole('checkbox', { name: /important announcements/i });
+    await userEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked(); // optimistic — no server response yet
   });
 });
