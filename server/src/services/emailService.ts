@@ -81,3 +81,27 @@ export function eventReminderEmail(title: string, startAtIso: string, link: stri
     </div>`,
   };
 }
+
+export function taskAssignedEmail(title: string, dueAtIso: string | null, link: string): { subject: string; html: string } {
+  const safeTitle = escapeHtml(title);
+  return {
+    subject: `New task: ${title}`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p>You've been assigned a task: <strong>${safeTitle}</strong></p>
+      ${dueAtIso ? `<p>Due: ${dueAtIso}</p>` : ''}
+      <p><a href="${link}">Open the task</a></p>
+    </div>`,
+  };
+}
+
+export function taskDueEmail(kind: 'due-soon' | 'overdue', title: string, link: string): { subject: string; html: string } {
+  const safeTitle = escapeHtml(title);
+  const lead = kind === 'due-soon' ? 'is due within 24 hours' : 'is overdue';
+  return {
+    subject: kind === 'due-soon' ? `Task due soon: ${title}` : `Task overdue: ${title}`,
+    html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+      <p>Your task <strong>${safeTitle}</strong> ${lead}.</p>
+      <p><a href="${link}">Open the task</a></p>
+    </div>`,
+  };
+}
