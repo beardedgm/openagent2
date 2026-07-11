@@ -55,6 +55,37 @@ tasksRouter.get(
 );
 
 tasksRouter.get(
+  '/onboarding/mine',
+  asyncHandler(async (req, res) => {
+    const me = req.user!.id;
+    const tasks = await Task.find({ isOnboarding: true, 'completions.userId': me });
+    const completed = tasks.filter((t) =>
+      t.completions.some((c) => String(c.userId) === me && c.completedAt),
+    ).length;
+    res.json({ total: tasks.length, completed });
+  }),
+);
+
+tasksRouter.get(
+  '/onboarding/status',
+  requireRole('officeAdmin'),
+  asyncHandler(async (_req, res) => {
+    const rows = await Task.aggregate([
+      { $match: { isOnboarding: true } },
+      { $unwind: '$completions' },
+      {
+        $group: {
+          _id: '$completions.userId',
+          total: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $ne: ['$completions.completedAt', null] }, 1, 0] } },
+        },
+      },
+    ]);
+    res.json({ statuses: rows.map((r) => ({ userId: String(r._id), total: r.total, completed: r.completed })) });
+  }),
+);
+
+tasksRouter.get(
   '/:id',
   asyncHandler(async (req, res) => {
     const me = req.user!;

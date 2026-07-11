@@ -12,6 +12,7 @@ import { emitActivity } from './activityService.js';
 import { invitationAcceptedEmail } from './emailService.js';
 import { logEngagement } from './engagementService.js';
 import { notify } from './notificationService.js';
+import { instantiateTemplate } from './taskService.js';
 
 function regenerate(req: Request): Promise<void> {
   return new Promise((resolve, reject) =>
@@ -76,10 +77,17 @@ export async function register(
       { type: 'invitationAccepted', title: `${user.displayName} accepted your invitation`, link: `/profile/${user.id}` },
       invitationAcceptedEmail(user.displayName, `${env.APP_DOMAIN}/profile/${user.id}`),
     );
+    if (settings.onboardingTaskTemplateId) {
+      await instantiateTemplate(
+        String(settings.onboardingTaskTemplateId),
+        { type: 'users', userIds: [user.id] },
+        String(invitation.invitedBy),
+        { isOnboarding: true },
+      );
+    }
   } catch (err) {
     logger.error(err, 'post-registration side effects failed');
   }
-  // Stage 3 wiring: auto-assign Settings.onboardingTaskTemplateId once Tasks exist.
   return user;
 }
 
