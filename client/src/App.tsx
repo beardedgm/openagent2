@@ -5,6 +5,8 @@ import { BoardPage } from './pages/BoardPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DirectoryPage } from './pages/DirectoryPage';
+import { EventDetailPage } from './pages/EventDetailPage';
+import { EventEditorPage } from './pages/EventEditorPage';
 import { FeedPage } from './pages/FeedPage';
 import { LoginPage } from './pages/LoginPage';
 import { PostEditorPage } from './pages/PostEditorPage';
@@ -49,6 +51,9 @@ export function App() {
         />
         <Route path="/feed" element={<FeedPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/calendar/new" element={<EventEditorPage />} />
+        <Route path="/calendar/:id" element={<EventDetailPage />} />
+        <Route path="/calendar/:id/edit" element={<EventEditorPage />} />
         <Route
           path="/admin/users"
           element={
