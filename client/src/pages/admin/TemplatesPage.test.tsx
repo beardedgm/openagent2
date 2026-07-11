@@ -19,7 +19,7 @@ const existingTemplate = {
   id: 't1',
   name: 'New Agent Onboarding',
   items: [
-    { title: 'Sign paperwork', descriptionHtml: '', priority: 'High', dueInDays: 1 },
+    { title: 'Sign paperwork', descriptionHtml: '<p>keep me</p>', priority: 'High', dueInDays: 1 },
     { title: 'Shadow a showing', descriptionHtml: '', priority: 'Medium', dueInDays: 7 },
   ],
   createdAt: new Date().toISOString(),
@@ -79,6 +79,31 @@ describe('TemplatesPage', () => {
       expect.objectContaining({
         name: 'Listing Checklist',
         items: [expect.objectContaining({ title: 'Order sign' })],
+      }),
+    );
+  });
+
+  it('round-trips item descriptions when editing a template', async () => {
+    mockApi();
+    patchMock.mockResolvedValue({ data: { template: existingTemplate } });
+
+    render(wrap());
+    await screen.findByText('New Agent Onboarding');
+
+    await userEvent.click(screen.getByRole('button', { name: /edit/i }));
+    const nameInput = screen.getByLabelText(/^name$/i);
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Renamed Onboarding');
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(patchMock).toHaveBeenCalledWith(
+      '/task-templates/t1',
+      expect.objectContaining({
+        name: 'Renamed Onboarding',
+        items: [
+          expect.objectContaining({ title: 'Sign paperwork', descriptionHtml: '<p>keep me</p>' }),
+          expect.objectContaining({ title: 'Shadow a showing', descriptionHtml: '' }),
+        ],
       }),
     );
   });

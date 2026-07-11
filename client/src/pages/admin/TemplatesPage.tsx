@@ -11,6 +11,8 @@ import { Spinner } from '../../components/ui/Spinner';
 
 interface ItemRow {
   title: string;
+  // descriptionHtml has no editor UI in Phase 1 but must round-trip — instantiated tasks consume it.
+  descriptionHtml: string;
   priority: TaskPriority;
   dueInDays: number | null;
 }
@@ -29,7 +31,7 @@ const rowInputStyle = {
 };
 
 function emptyItem(): ItemRow {
-  return { title: '', priority: 'Medium', dueInDays: null };
+  return { title: '', descriptionHtml: '', priority: 'Medium', dueInDays: null };
 }
 
 export function TemplatesPage() {
@@ -49,7 +51,14 @@ export function TemplatesPage() {
   function edit(tpl: TaskTemplateInfo) {
     setEditingId(tpl.id);
     setName(tpl.name);
-    setItems(tpl.items.map((i) => ({ title: i.title, priority: i.priority, dueInDays: i.dueInDays })));
+    setItems(
+      tpl.items.map((i) => ({
+        title: i.title,
+        descriptionHtml: i.descriptionHtml,
+        priority: i.priority,
+        dueInDays: i.dueInDays,
+      })),
+    );
   }
 
   const save = useMutation({
@@ -58,7 +67,7 @@ export function TemplatesPage() {
         name,
         items: items.map((i) => ({
           title: i.title,
-          descriptionHtml: '',
+          descriptionHtml: i.descriptionHtml,
           priority: i.priority,
           dueInDays: i.dueInDays,
         })),

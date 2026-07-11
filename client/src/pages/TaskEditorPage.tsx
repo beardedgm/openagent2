@@ -68,7 +68,8 @@ export function TaskEditorPage() {
       ? ((save.error.response?.data as { error?: string })?.error ?? 'Could not save the task')
       : undefined;
 
-  const submitDisabled = save.isPending || (audienceType === 'users' && userIds.length === 0);
+  const submitDisabled =
+    save.isPending || (audienceType === 'users' && userIds.length === 0) || (audienceType === 'office' && !officeId);
 
   return (
     <Card style={{ maxWidth: 720 }}>
