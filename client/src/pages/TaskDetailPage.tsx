@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Paperclip } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useTask } from '../api/hooks';
@@ -15,6 +15,7 @@ export function TaskDetailPage() {
   const { data, isLoading, error } = useTask(id);
   const qc = useQueryClient();
   const [note, setNote] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const complete = useMutation({
     mutationFn: () => api.post(`/tasks/${id}/complete`, { note }),
@@ -30,6 +31,23 @@ export function TaskDetailPage() {
       : complete.isError
         ? 'Could not complete the task'
         : undefined;
+
+  const uploadAttachment = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.post(`/tasks/${id}/attachments`, formData);
+    },
+    onSuccess: async () => {
+      // List view doesn't show attachments, so only the detail query needs invalidating.
+      await qc.invalidateQueries({ queryKey: ['tasks', id] });
+    },
+  });
+
+  const uploadError =
+    uploadAttachment.isError && isAxiosError(uploadAttachment.error)
+      ? ((uploadAttachment.error.response?.data as { error?: string })?.error ?? 'Could not upload the attachment')
+      : undefined;
 
   if (isLoading) return <Spinner label="Loading task" />;
   if (!data) {
@@ -76,6 +94,33 @@ export function TaskDetailPage() {
                 {a.name} ({Math.max(1, Math.round(a.size / 1024))} KB)
               </a>
             ))}
+          </div>
+        )}
+        {/* `matrix` is only sent by the server to the task's creator or an admin — the same
+            audience allowed to POST /tasks/:id/attachments — so it doubles as the upload gate. */}
+        {matrix && task.attachments.length < 5 && (
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+              Add attachment
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.docx,.xlsx"
+              hidden
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0];
+                if (file) uploadAttachment.mutate(file);
+                // Clear the input so selecting the same file again (e.g. after a failed
+                // upload) still fires this change handler.
+                e.currentTarget.value = '';
+              }}
+            />
+            {uploadError && (
+              <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+                {uploadError}
+              </p>
+            )}
           </div>
         )}
       </Card>

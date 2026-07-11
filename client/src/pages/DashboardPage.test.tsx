@@ -92,4 +92,30 @@ describe('DashboardPage', () => {
     expect(await screen.findByText('Nothing open — nice.')).toBeInTheDocument();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
+
+  it('lists a due-soon task before a no-due-date task, even though the server returns no-due first', async () => {
+    getMock.mockImplementation(async (url: string) => {
+      if (url === '/auth/me') return { data: { user: { id: 'me', role: 'agent', displayName: 'Me', officeId: null } } };
+      if (url === '/settings') return { data: { settings } };
+      if (url.startsWith('/tasks?')) {
+        return {
+          data: {
+            // Mirrors the server's Mongo sort (dueAt ascending, nulls first).
+            tasks: [
+              task({ id: 't1', title: 'No due task', dueAt: null }),
+              task({ id: 't2', title: 'Due soon task', dueAt: new Date(Date.now() + 86_400_000).toISOString() }),
+            ],
+          },
+        };
+      }
+      if (url === '/tasks/onboarding/mine') return { data: { total: 0, completed: 0 } };
+      throw new Error(`Unhandled GET ${url}`);
+    });
+
+    render(wrap());
+
+    const links = await screen.findAllByRole('link', { name: /task$/i });
+    expect(links[0]).toHaveTextContent('Due soon task');
+    expect(links[1]).toHaveTextContent('No due task');
+  });
 });

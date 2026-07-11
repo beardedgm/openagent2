@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -70,5 +70,30 @@ describe('TaskDetailPage', () => {
     expect(screen.getByText(/you completed this task/i)).toBeInTheDocument();
     expect(screen.getByText('Ana')).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
+  });
+
+  it('lets an admin (matrix present) upload an attachment, and hides the control for an agent', async () => {
+    mockApi({
+      role: 'broker',
+      matrix: [{ userId: 'u1', displayName: 'Ana', completedAt: null, note: '' }],
+    });
+    const { container, unmount } = render(wrap());
+    await screen.findByText('File the form');
+
+    const addButton = screen.getByRole('button', { name: /add attachment/i });
+    expect(addButton).toBeInTheDocument();
+
+    const input = container.querySelector('input[type=file]') as HTMLInputElement;
+    const file = new File(['contents'], 'notes.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await Promise.resolve();
+    expect(postMock).toHaveBeenCalledWith('/tasks/t1/attachments', expect.any(FormData));
+    unmount();
+
+    mockApi({ role: 'agent' });
+    render(wrap());
+    await screen.findByText('File the form');
+    expect(screen.queryByRole('button', { name: /add attachment/i })).not.toBeInTheDocument();
   });
 });

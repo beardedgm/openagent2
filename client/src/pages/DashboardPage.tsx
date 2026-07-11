@@ -9,7 +9,12 @@ export function DashboardPage() {
   const { data: settings } = useSettings();
   const { data: onboarding } = useMyOnboarding();
   const { data: tasks } = useTasks('mine');
-  const openTasks = (tasks ?? []).filter((t) => !t.myCompletion?.completedAt).slice(0, 5);
+  // The server sorts dueAt ascending with nulls first (Mongo default), which would crowd
+  // no-due-date tasks ahead of due-soon ones here. Re-sort client-side with nulls last.
+  const openTasks = (tasks ?? [])
+    .filter((t) => !t.myCompletion?.completedAt)
+    .sort((a, b) => (a.dueAt ? new Date(a.dueAt).getTime() : Infinity) - (b.dueAt ? new Date(b.dueAt).getTime() : Infinity))
+    .slice(0, 5);
   const showOnboarding = onboarding && onboarding.total > 0 && onboarding.completed < onboarding.total;
 
   return (

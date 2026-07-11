@@ -342,7 +342,7 @@ export function SettingsPage() {
       <Card>
         <h2 style={{ fontSize: 18, marginBottom: 'var(--space-3)' }}>RSS feeds</h2>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginBottom: 'var(--space-3)' }}>
-          Feeds appear in the Activity Feed (coming in the next release).
+          Feeds appear in the Activity Feed.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {rssFeeds.map((feed, index) => (
