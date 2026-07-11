@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { TaskInfo } from '../api/types';
@@ -59,5 +60,32 @@ describe('TasksPage', () => {
     expect(await screen.findByText('Anything')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /new task/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /all tasks/i })).toBeInTheDocument();
+  });
+
+  it('all scope keys Overdue off aggregate completion, not the viewer', async () => {
+    getMock.mockImplementation(async (url: string) => {
+      if (url === '/auth/me') return { data: { user: { id: 'me', role: 'broker', displayName: 'Me', officeId: null } } };
+      if (url === '/tasks?scope=mine') return { data: { tasks: [] } };
+      if (url === '/tasks?scope=all')
+        return {
+          data: {
+            tasks: [
+              task({
+                id: 't4',
+                title: 'Everyone finished',
+                dueAt: new Date(Date.now() - 86_400_000).toISOString(),
+                myCompletion: null,
+                counts: { total: 3, completed: 3 },
+              }),
+            ],
+          },
+        };
+      throw new Error(`Unhandled GET ${url}`);
+    });
+    render(wrap());
+    await userEvent.click(await screen.findByRole('button', { name: /all tasks/i }));
+    expect(await screen.findByText('Everyone finished')).toBeInTheDocument();
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
+    expect(screen.getByText(/3\/3 done/)).toBeInTheDocument();
   });
 });
