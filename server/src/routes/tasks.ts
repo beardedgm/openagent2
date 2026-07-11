@@ -18,6 +18,9 @@ function isAdmin(role: string): boolean {
 
 const attachmentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const MAX_ATTACHMENTS = 5;
+// Mimetype is client-asserted (multer reports the multipart header) — acceptable here:
+// uploaders are trusted admins, downloads always force attachment disposition, and the
+// allowlist excludes inline-renderable types (html/svg).
 const ATTACHMENT_TYPES = new Set([
   'application/pdf',
   'image/png',

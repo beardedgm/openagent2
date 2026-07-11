@@ -19,7 +19,7 @@ import { taskTemplatesRouter } from './routes/taskTemplates.js';
 import { tasksRouter } from './routes/tasks.js';
 import { uploadsRouter } from './routes/uploads.js';
 import { usersRouter } from './routes/users.js';
-import { LOCAL_UPLOAD_DIR } from './services/storage.js';
+import { LOCAL_PUBLIC_DIR } from './services/storage.js';
 
 declare module 'express-session' {
   interface SessionData {
@@ -80,15 +80,11 @@ export function createApp(): express.Express {
   app.use('/api/v1/events', eventsRouter);
   app.use('/api/v1/tasks', tasksRouter);
   app.use('/api/v1/task-templates', taskTemplatesRouter);
-  if (env.STORAGE_DRIVER === 'local') {
-    // Protected files live under uploads/private/ and are served ONLY through
-    // authorized download routes — never by the public static mount.
-    app.use('/files', (req, res, next) => {
-      if (req.path.startsWith('/private/')) return res.status(404).json({ error: 'Not found' });
-      next();
-    });
-    app.use('/files', express.static(LOCAL_UPLOAD_DIR));
-  }
+  // The static mount serves ONLY uploads/public/ — private files live in a disjoint
+  // subtree (uploads/private/) that is not under the served root, so no encoding or
+  // traversal trick can reach them. (Dev files uploaded before this split live at the
+  // old uploads/ root and need re-uploading — dev-only, acceptable.)
+  if (env.STORAGE_DRIVER === 'local') app.use('/files', express.static(LOCAL_PUBLIC_DIR));
 
   if (prod) {
     // compiled file lives at server/dist/src/app.js → repo root is ../../..

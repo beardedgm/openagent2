@@ -18,16 +18,20 @@ export interface StoragePort {
 }
 
 export const LOCAL_UPLOAD_DIR = join(process.cwd(), 'uploads');
+// Public and private files live in DISJOINT subtrees; the /files static mount serves
+// only public/ — no path trick can cross into private/ because it simply isn't under
+// the served root.
+export const LOCAL_PUBLIC_DIR = join(LOCAL_UPLOAD_DIR, 'public');
 const SIGNED_URL_TTL_SECONDS = 15 * 60; // spec §3: 15-minute expiry
 
 class LocalStorage implements StoragePort {
   async putPublic(key: string, body: Buffer): Promise<string> {
-    await this.write(key, body);
+    await this.write(join(LOCAL_PUBLIC_DIR, key), body);
     return `/files/${key}`;
   }
 
   async putPrivate(key: string, body: Buffer): Promise<string> {
-    await this.write(key, body);
+    await this.write(join(LOCAL_UPLOAD_DIR, key), body);
     return key;
   }
 
@@ -35,8 +39,7 @@ class LocalStorage implements StoragePort {
     return { kind: 'file', path: join(LOCAL_UPLOAD_DIR, key) };
   }
 
-  private async write(key: string, body: Buffer): Promise<void> {
-    const path = join(LOCAL_UPLOAD_DIR, key);
+  private async write(path: string, body: Buffer): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, body);
   }

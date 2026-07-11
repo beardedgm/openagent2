@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { Task } from '../src/models/Task.js';
 import { User } from '../src/models/User.js';
 import { hashPassword } from '../src/utils/password.js';
 
@@ -64,9 +65,30 @@ describe('task attachments', () => {
     expect(sixth.status).toBe(400);
   });
 
-  it('the local /files mount refuses private keys', async () => {
+  it('the local /files mount cannot serve private keys, including via bypass tricks', async () => {
     const app = createApp();
-    const res = await request(app).get('/files/private/tasks/aaaaaaaaaaaaaaaaaaaaaaaa/x.pdf');
-    expect(res.status).toBe(404);
+    const broker = await loginAs(app, 'at5@x.com', 'broker');
+    const id = (await broker.post('/api/v1/tasks').send({ title: 'Sec', audience: { type: 'all' } })).body.task.id;
+    const up = await broker
+      .post(`/api/v1/tasks/${id}/attachments`)
+      .attach('file', PDF, { filename: 'secret.pdf', contentType: 'application/pdf' });
+    expect(up.status).toBe(201);
+    // The file genuinely exists on disk under uploads/private — no path form may serve
+    // it. Encoded/dotted/case variants defeated a pattern-match guard on the raw path
+    // (express.static decodes and normalizes AFTER middleware sees req.path); the mount
+    // now serves a disjoint public/ subtree, so none of these can resolve.
+    const key = (await Task.findById(id))!.attachments[0].key; // private/tasks/<hex>/secret.pdf
+    const attempts = [
+      `/files/${key}`,
+      `/files/%2f${key}`,
+      `/files/./${key}`,
+      `/files/foo/../${key}`,
+      `/files/${key.replace('private', 'PRIVATE')}`, // case-insensitive filesystems
+      '/files/private/tasks/aaaaaaaaaaaaaaaaaaaaaaaa/x.pdf',
+    ];
+    for (const path of attempts) {
+      const res = await request(app).get(path);
+      expect([403, 404], path).toContain(res.status);
+    }
   });
 });
