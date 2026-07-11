@@ -5,7 +5,7 @@ import { User } from '../models/User.js';
 import { eventReminderEmail, sendEmail } from '../services/emailService.js';
 import { expandOccurrences } from '../utils/recurrence.js';
 
-const WINDOW_MS = 15 * 60_000; // matches the agenda every-15-minutes cadence
+const WINDOW_MS = 20 * 60_000; // 15-min cadence + 5-min overlap margin — see comment below
 const LEADS = [
   { key: '24h', ms: 24 * 3_600_000 },
   { key: '1h', ms: 3_600_000 },
@@ -23,8 +23,14 @@ function toSpan(event: CalendarEventDoc) {
   };
 }
 
-/** Email-only, opt-in reminders (PRD 5.4). Runs every 15 minutes; windows that pass
- * while the host sleeps are skipped, not back-filled — a late reminder is noise. */
+/** Email-only, opt-in reminders (PRD 5.4). Runs every 15 minutes; the window is
+ * 20 minutes so consecutive scans OVERLAP — Agenda anchors each run to the previous
+ * execution time (spacing ≥ cadence, never less), and without overlap every cycle
+ * would leak a drift-sized gap of missed reminders. The per-occurrence latch dedupes
+ * the overlap. Only multi-window outages (sleeping host) skip reminders, by design —
+ * a late reminder is noise.
+ * Reviewed product decisions (accepted as-is): mandatory-event reminders stay behind
+ * the eventReminders opt-in, and creators DO receive their own mandatory-event reminders. */
 export async function sweepEventReminders(): Promise<void> {
   const now = Date.now();
   for (const lead of LEADS) {
@@ -52,7 +58,9 @@ export async function sweepEventReminders(): Promise<void> {
         const latch = `${occ.startAt.toISOString()}|${lead.key}`;
         const claimed = await CalendarEvent.updateOne(
           { _id: event.id, remindersSent: { $ne: latch } },
-          { $push: { remindersSent: latch } },
+          // $addToSet is redundant with the $ne guard but keeps the claim
+          // duplicate-proof if the filter is ever refactored.
+          { $addToSet: { remindersSent: latch } },
         );
         if (claimed.modifiedCount !== 1) continue; // already reminded (or raced)
         try {
