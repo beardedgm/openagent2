@@ -13,6 +13,8 @@ import { PostEditorPage } from './pages/PostEditorPage';
 import { PostPage } from './pages/PostPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
+import { TaskDetailPage } from './pages/TaskDetailPage';
+import { TasksPage } from './pages/TasksPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 
@@ -54,6 +56,8 @@ export function App() {
         <Route path="/calendar/new" element={<EventEditorPage />} />
         <Route path="/calendar/:id" element={<EventDetailPage />} />
         <Route path="/calendar/:id/edit" element={<EventEditorPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/tasks/:id" element={<TaskDetailPage />} />
         <Route
           path="/admin/users"
           element={

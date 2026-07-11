@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -92,6 +92,10 @@ export function AppShell() {
           <NavLink to="/calendar" style={({ isActive }) => navLinkStyle(isActive)}>
             <CalendarDays size={18} />
             Calendar
+          </NavLink>
+          <NavLink to="/tasks" style={({ isActive }) => navLinkStyle(isActive)}>
+            <ClipboardList size={18} />
+            Tasks
           </NavLink>
           {isAdmin && (
             <>
