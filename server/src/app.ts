@@ -15,6 +15,7 @@ import { eventsRouter } from './routes/events.js';
 import { feedRouter } from './routes/feed.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { postsRouter } from './routes/posts.js';
+import { resourcesRouter } from './routes/resources.js';
 import { adminSettingsRouter, settingsRouter } from './routes/settings.js';
 import { taskTemplatesRouter } from './routes/taskTemplates.js';
 import { tasksRouter } from './routes/tasks.js';
@@ -82,6 +83,7 @@ export function createApp(): express.Express {
   app.use('/api/v1/tasks', tasksRouter);
   app.use('/api/v1/task-templates', taskTemplatesRouter);
   app.use('/api/v1/categories', categoriesRouter);
+  app.use('/api/v1/resources', resourcesRouter);
   // The static mount serves ONLY uploads/public/ — private files live in a disjoint
   // subtree (uploads/private/) that is not under the served root, so no encoding or
   // traversal trick can reach them. (Dev files uploaded before this split live at the
