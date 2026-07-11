@@ -80,6 +80,21 @@ describe('PostPage', () => {
     expect(postMock).toHaveBeenCalledWith('/posts/p1/comments', { body: 'Great!' });
   });
 
+  it('surfaces an error when adding a comment fails', async () => {
+    mockApi();
+    postMock.mockRejectedValueOnce(
+      Object.assign(new Error('request failed'), {
+        isAxiosError: true,
+        response: { data: { error: 'Comments are disabled on this post' } },
+      }),
+    );
+    render(wrap());
+    await screen.findByText('Big news');
+    await userEvent.type(screen.getByLabelText(/add a comment/i), 'Great!');
+    await userEvent.click(screen.getByRole('button', { name: /^comment$/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Comments are disabled on this post');
+  });
+
   it('hides the comment form when comments are disabled and shows admin actions', async () => {
     mockApi({ role: 'broker', commentsEnabled: false });
     render(wrap());

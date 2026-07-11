@@ -10,6 +10,12 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 
+function mutationErrorMessage(isError: boolean, error: unknown, fallback: string): string | undefined {
+  if (!isError) return undefined;
+  if (isAxiosError(error)) return (error.response?.data as { error?: string })?.error ?? fallback;
+  return fallback;
+}
+
 export function PostPage() {
   const { id } = useParams();
   const { data: post, isLoading, error } = usePost(id);
@@ -38,16 +44,18 @@ export function PostPage() {
   });
   const deletePost = useMutation({
     mutationFn: () => api.delete(`/posts/${id}`),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['posts'] });
+    onSuccess: () => {
+      // Navigate first — invalidating while this page is still mounted refetches the deleted post into a 404.
       navigate('/board');
+      void qc.invalidateQueries({ queryKey: ['posts'] });
     },
   });
 
-  const pinError =
-    togglePin.isError && isAxiosError(togglePin.error)
-      ? ((togglePin.error.response?.data as { error?: string })?.error ?? 'Could not pin')
-      : undefined;
+  const pinError = mutationErrorMessage(togglePin.isError, togglePin.error, 'Could not pin');
+  const deleteError = mutationErrorMessage(deletePost.isError, deletePost.error, 'Could not delete the post');
+  const commentError =
+    mutationErrorMessage(addComment.isError, addComment.error, 'Could not save the comment') ??
+    mutationErrorMessage(deleteComment.isError, deleteComment.error, 'Could not delete the comment');
 
   if (isLoading) return <Spinner label="Loading post" />;
   if (!post) {
@@ -113,6 +121,11 @@ export function PostPage() {
             {pinError}
           </p>
         )}
+        {deleteError && (
+          <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+            {deleteError}
+          </p>
+        )}
       </Card>
 
       <Card>
@@ -142,8 +155,10 @@ export function PostPage() {
             </div>
             {(isAdmin || c.author?.id === me?.id) && (
               <button
-                aria-label="Delete comment"
-                onClick={() => deleteComment.mutate(c.id)}
+                aria-label={`Delete comment by ${c.author?.displayName ?? 'unknown'}`}
+                onClick={() => {
+                  if (window.confirm('Delete this comment?')) deleteComment.mutate(c.id);
+                }}
                 style={{
                   width: 44,
                   height: 44,
@@ -187,6 +202,11 @@ export function PostPage() {
               Comment
             </Button>
           </form>
+        )}
+        {commentError && (
+          <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+            {commentError}
+          </p>
         )}
       </Card>
     </div>
