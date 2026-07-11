@@ -29,6 +29,15 @@ function shift(view: View, anchor: Date, dir: 1 | -1): Date {
   return addDays(anchor, view === 'week' ? 7 * dir : dir);
 }
 
+// Overlap test, not a start-day match: a multi-day event must appear in every day cell it
+// spans, and an event that started before the visible range must still render on the days
+// it covers (bucketing on startAt alone would drop it entirely).
+function occursOnDay(o: EventOccurrence, day: Date): boolean {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+  const dayEnd = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate() + 1);
+  return new Date(o.startAt) < dayEnd && new Date(o.endAt) > dayStart;
+}
+
 export function CalendarPage() {
   const [view, setView] = useState<View>('month'); // PRD 5.4: default Month
   const [anchor, setAnchor] = useState(() => new Date());
@@ -59,28 +68,39 @@ export function CalendarPage() {
     </button>
   );
 
-  const listDays = (days: Date[]) => (
-    <Card>
-      {days.map((day) => {
-        const todays = (occurrences ?? []).filter((o) => sameLocalDay(new Date(o.startAt), day));
-        if (todays.length === 0 && view === 'week') return null;
-        return (
-          <div key={day.toISOString()} style={{ padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-border)' }}>
-            <strong style={{ fontSize: 14 }}>{day.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
-            {todays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No events.</p>}
-            {todays.map((o) => (
-              <div key={`${o.event.id}-${o.startAt}`} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'baseline', minHeight: 32 }}>
-                <span style={{ fontSize: 13, color: 'var(--color-text-muted)', width: 90, flexShrink: 0 }}>
-                  {o.event.allDay ? 'All day' : new Date(o.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                </span>
-                {occLabel(o)}
-              </div>
-            ))}
-          </div>
-        );
-      })}
-    </Card>
-  );
+  const listDays = (days: Date[]) => {
+    const hasAny = days.some((day) => (occurrences ?? []).some((o) => occursOnDay(o, day)));
+    return (
+      <Card>
+        {view === 'week' && !hasAny && (
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>No events this week.</p>
+        )}
+        {days.map((day) => {
+          const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+          const todays = (occurrences ?? []).filter((o) => occursOnDay(o, day));
+          if (todays.length === 0 && view === 'week') return null;
+          return (
+            <div key={day.toISOString()} style={{ padding: 'var(--space-2) 0', borderBottom: '1px solid var(--color-border)' }}>
+              <strong style={{ fontSize: 14 }}>{day.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
+              {todays.length === 0 && <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>No events.</p>}
+              {todays.map((o) => (
+                <div key={`${o.event.id}-${o.startAt}`} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'baseline', minHeight: 32 }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-text-muted)', width: 90, flexShrink: 0 }}>
+                    {o.event.allDay
+                      ? 'All day'
+                      : new Date(o.startAt) < dayStart
+                        ? 'Ongoing'
+                        : new Date(o.startAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                  {occLabel(o)}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </Card>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -115,7 +135,7 @@ export function CalendarPage() {
               <div key={d} style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', padding: 4 }}>{d}</div>
             ))}
             {monthGrid(anchor.getFullYear(), anchor.getMonth()).map((cell) => {
-              const todays = (occurrences ?? []).filter((o) => sameLocalDay(new Date(o.startAt), cell.date));
+              const todays = (occurrences ?? []).filter((o) => occursOnDay(o, cell.date));
               return (
                 <div
                   key={cell.date.toISOString()}

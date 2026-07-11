@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type {
   CalendarEventInfo,
@@ -116,6 +116,9 @@ export function useEvents(fromIso: string, toIso: string) {
           `/events?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`,
         )
       ).data.occurrences,
+    // Prev/next changes the query key every step; keep the old grid on screen while the
+    // new range loads instead of blanking the calendar on every navigation.
+    placeholderData: keepPreviousData,
   });
 }
 

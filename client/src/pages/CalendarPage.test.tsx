@@ -16,16 +16,16 @@ function mockApi(occurrences: unknown[]) {
   });
 }
 
-function occ(title: string, startAt: Date, mandatory = false) {
+function occ(title: string, startAt: Date, mandatory = false, endAt = new Date(startAt.getTime() + 3_600_000)) {
   return {
     event: {
       id: `e-${title}`, title, descriptionHtml: '', kind: 'office', createdBy: 'x', officeId: null,
-      startAt: startAt.toISOString(), endAt: new Date(startAt.getTime() + 3_600_000).toISOString(),
+      startAt: startAt.toISOString(), endAt: endAt.toISOString(),
       allDay: false, location: '', recurrence: 'none', recurrenceUntil: null,
       rsvpEnabled: false, mandatory, resourceId: null, myRsvp: null, createdAt: startAt.toISOString(),
     },
     startAt: startAt.toISOString(),
-    endAt: new Date(startAt.getTime() + 3_600_000).toISOString(),
+    endAt: endAt.toISOString(),
   };
 }
 
@@ -54,6 +54,15 @@ describe('CalendarPage', () => {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
     expect(screen.getByRole('link', { name: /new event/i })).toBeInTheDocument();
+  });
+
+  it('renders a multi-day event in every month cell it spans', async () => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 10, 0);
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2, 11, 0);
+    mockApi([occ('Conference', start, false, end)]);
+    render(wrap());
+    expect(await screen.findAllByText('Conference')).toHaveLength(3);
   });
 
   it('switches to week view as a chronological list', async () => {
