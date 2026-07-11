@@ -1,9 +1,12 @@
+import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app.js';
 import { ActivityEvent } from '../src/models/ActivityEvent.js';
 import { CalendarEvent } from '../src/models/CalendarEvent.js';
 import { Notification } from '../src/models/Notification.js';
 import { getSettings } from '../src/models/Settings.js';
 import { User } from '../src/models/User.js';
+import { hashPassword } from '../src/utils/password.js';
 
 const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn(async () => true) }));
 vi.mock('../src/services/emailService.js', async (importOriginal) => ({
@@ -223,5 +226,118 @@ describe('calendarService', () => {
     await settings.save();
     const updated = await updateEvent(e.id, { title: 'Renamed' }, broker);
     expect(updated.title).toBe('Renamed');
+  });
+});
+
+async function loginAs(app: ReturnType<typeof createApp>, email: string, role: string, officeId: string | null = null) {
+  await User.create({ email, hashedPassword: await hashPassword('Password1!'), role, displayName: email, officeId });
+  const agent = request.agent(app);
+  await agent.post('/api/v1/auth/login').send({ email, password: 'Password1!' });
+  return agent;
+}
+
+describe('event routes', () => {
+  it('lists expanded occurrences with visibility scoping', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'r1@x.com', 'broker');
+    const officeA = '64b000000000000000000001';
+    const agentA = await loginAs(app, 'r2@x.com', 'agent', officeA);
+    const agentB = await loginAs(app, 'r3@x.com', 'agent', '64b000000000000000000002');
+
+    // Broker: weekly office event for everyone.
+    await broker.post('/api/v1/events').send({
+      title: 'Standup', kind: 'office',
+      startAt: '2026-08-03T15:00:00.000Z', endAt: '2026-08-03T15:30:00.000Z', recurrence: 'weekly',
+    });
+    // Broker: office-A-only event.
+    await broker.post('/api/v1/events').send({
+      title: 'Office A social', kind: 'office', officeId: officeA,
+      startAt: '2026-08-04T22:00:00.000Z', endAt: '2026-08-04T23:00:00.000Z',
+    });
+    // Agent A: personal block.
+    await agentA.post('/api/v1/events').send({
+      title: 'Dentist', kind: 'personal',
+      startAt: '2026-08-05T16:00:00.000Z', endAt: '2026-08-05T17:00:00.000Z',
+    });
+
+    const q = '/api/v1/events?from=2026-08-01T00:00:00.000Z&to=2026-08-15T00:00:00.000Z';
+    const a = await agentA.get(q);
+    const titles = a.body.occurrences.map((o: { event: { title: string } }) => o.event.title);
+    expect(titles.filter((t: string) => t === 'Standup')).toHaveLength(2); // weekly ×2 in range
+    expect(titles).toContain('Office A social');
+    expect(titles).toContain('Dentist');
+
+    const b = await agentB.get(q);
+    const bTitles = b.body.occurrences.map((o: { event: { title: string } }) => o.event.title);
+    expect(bTitles).not.toContain('Office A social');
+    expect(bTitles).not.toContain('Dentist'); // personal events are private
+
+    const br = await broker.get(q);
+    const brTitles = br.body.occurrences.map((o: { event: { title: string } }) => o.event.title);
+    expect(brTitles).toContain('Office A social'); // admins see all office events
+    expect(brTitles).not.toContain('Dentist'); // …but not personal ones
+  });
+
+  it('rejects an office event created by an agent, and a missing/oversized range', async () => {
+    const app = createApp();
+    const agent = await loginAs(app, 'r4@x.com', 'agent');
+    expect(
+      (
+        await agent.post('/api/v1/events').send({
+          title: 'Nope', kind: 'office', startAt: '2026-08-01T10:00:00.000Z', endAt: '2026-08-01T11:00:00.000Z',
+        })
+      ).status,
+    ).toBe(403);
+    expect((await agent.get('/api/v1/events')).status).toBe(400);
+    expect(
+      (await agent.get('/api/v1/events?from=2026-01-01T00:00:00.000Z&to=2026-12-31T00:00:00.000Z')).status,
+    ).toBe(400); // > 92 days
+  });
+
+  it('rsvp via route and creator-only summary', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'r5@x.com', 'broker');
+    const agent = await loginAs(app, 'r6@x.com', 'agent');
+    const created = await broker.post('/api/v1/events').send({
+      title: 'Training', kind: 'office', rsvpEnabled: true,
+      startAt: '2026-08-06T15:00:00.000Z', endAt: '2026-08-06T16:00:00.000Z',
+    });
+    const id = created.body.event.id;
+    expect((await agent.post(`/api/v1/events/${id}/rsvp`).send({ response: 'yes' })).status).toBe(200);
+
+    const asAgent = await agent.get(`/api/v1/events/${id}`);
+    expect(asAgent.body.event.myRsvp).toBe('yes');
+    expect(asAgent.body.rsvpSummary).toBeUndefined(); // summary is creator/admin-only
+
+    const asBroker = await broker.get(`/api/v1/events/${id}`);
+    expect(asBroker.body.rsvpSummary.yes).toEqual(['r6@x.com']);
+    expect(asBroker.body.rsvpSummary.no).toEqual([]);
+  });
+
+  it('mandatory flag is broker-only through the route', async () => {
+    const app = createApp();
+    const admin = await loginAs(app, 'r7@x.com', 'officeAdmin');
+    expect(
+      (
+        await admin.post('/api/v1/events').send({
+          title: 'M', kind: 'office', mandatory: true,
+          startAt: '2026-08-06T15:00:00.000Z', endAt: '2026-08-06T16:00:00.000Z',
+        })
+      ).status,
+    ).toBe(403);
+  });
+
+  it('rejects a recurrenceUntil before startAt', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'r8@x.com', 'broker');
+    expect(
+      (
+        await broker.post('/api/v1/events').send({
+          title: 'Bad recurrence', kind: 'office', recurrence: 'weekly',
+          startAt: '2026-08-10T15:00:00.000Z', endAt: '2026-08-10T16:00:00.000Z',
+          recurrenceUntil: '2026-08-01T00:00:00.000Z',
+        })
+      ).status,
+    ).toBe(400);
   });
 });
