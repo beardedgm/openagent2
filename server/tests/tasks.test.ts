@@ -22,10 +22,14 @@ describe('resolveAudience', () => {
     expect(all).toHaveLength(3); // broker + 2 active agents, deactivated excluded
 
     const office = await resolveAudience({ type: 'office', userIds: [], officeId: officeA });
-    expect(office.map(String)).toEqual([inOffice.id]); // office members only, not admins
+    expect(office.map(String)).toEqual([inOffice.id]); // members of that office only (the broker has officeId null, so is excluded)
 
     const users = await resolveAudience({ type: 'users', userIds: [broker.id, deactivated.id], officeId: null });
     expect(users.map(String)).toEqual([broker.id]); // deactivated filtered out
+  });
+
+  it('rejects an office audience without an officeId', async () => {
+    await expect(resolveAudience({ type: 'office', userIds: [], officeId: null })).rejects.toThrow(/office/i);
   });
 });
 

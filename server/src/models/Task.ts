@@ -53,6 +53,8 @@ const taskSchema = new mongoose.Schema(
     // Sweeper claims this atomically to spawn the next instance.
     nextRecurrenceAt: { type: Date, default: null },
     audience: { type: audienceSchema, required: true },
+    // Invariant: completions.userId values are unique per task (resolveAudience dedupes via $in) —
+    // the sweeper's positional $ updates and the multikey index depend on it.
     completions: { type: [completionSchema], default: [] },
     isOnboarding: { type: Boolean, default: false },
     templateId: { type: mongoose.Schema.Types.ObjectId, default: null },

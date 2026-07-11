@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { AppError } from '../middleware/errorHandler.js';
 import { User } from '../models/User.js';
 import type { AudienceType } from '../models/Task.js';
 
@@ -17,6 +18,7 @@ export async function resolveAudience(audience: Audience): Promise<mongoose.Type
     return (await User.find(base).select('_id')).map((u) => u._id);
   }
   if (audience.type === 'office') {
+    if (!audience.officeId) throw new AppError(400, 'An office audience requires an officeId');
     return (await User.find({ ...base, officeId: audience.officeId }).select('_id')).map((u) => u._id);
   }
   return (await User.find({ ...base, _id: { $in: audience.userIds } }).select('_id')).map((u) => u._id);
