@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { AppError } from '../middleware/errorHandler.js';
 import { validate } from '../middleware/validate.js';
 import { getSettings } from '../models/Settings.js';
+import { TaskTemplate } from '../models/TaskTemplate.js';
 import { updateSettingsSchema } from '../validators/settings.js';
 
 export const settingsRouter = Router();
@@ -37,6 +39,11 @@ adminSettingsRouter.patch(
   '/',
   validate(updateSettingsSchema),
   asyncHandler(async (req, res) => {
+    if (req.body.onboardingTaskTemplateId != null) {
+      if (!(await TaskTemplate.findById(req.body.onboardingTaskTemplateId))) {
+        throw new AppError(400, 'Unknown task template');
+      }
+    }
     const s = await getSettings();
     Object.assign(s, req.body);
     await s.save();

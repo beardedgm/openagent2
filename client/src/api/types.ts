@@ -32,6 +32,7 @@ export interface Settings {
   quickLinks: { label: string; url: string }[];
   homepageLayout: string[];
   reservableResources: ReservableResource[];
+  onboardingTaskTemplateId: string | null;
 }
 
 export interface PublicSettings {

@@ -114,6 +114,7 @@ describe('UsersPage', () => {
       }
       if (url === '/users/invitations') return { data: { invitations: [invitation] } };
       if (url === '/settings') return { data: { settings } };
+      if (url === '/tasks/onboarding/status') return { data: { statuses: [] } };
       throw new Error(`Unhandled GET ${url}`);
     });
     postMock.mockReset();
@@ -181,6 +182,35 @@ describe('UsersPage', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Invitation created but the email could not be sent — use Resend.',
     );
+  });
+
+  it('renders the onboarding column as Done, in-progress, or — per row', async () => {
+    getMock.mockImplementation(async (url: string) => {
+      if (url === '/auth/me') return { data: { user: officeAdminUser } };
+      if (url === '/users?includeDeactivated=true') {
+        return { data: { users: [officeAdminUser, agentUser, deactivatedAgent, brokerUser] } };
+      }
+      if (url === '/users/invitations') return { data: { invitations: [invitation] } };
+      if (url === '/settings') return { data: { settings } };
+      if (url === '/tasks/onboarding/status') {
+        return { data: { statuses: [
+          { userId: 'u2', total: 3, completed: 3 },
+          { userId: 'u3', total: 4, completed: 1 },
+        ] } };
+      }
+      throw new Error(`Unhandled GET ${url}`);
+    });
+
+    render(wrap());
+
+    const agentRow = (await screen.findByText('Ana Agent')).closest('tr');
+    expect(within(agentRow!).getByText('Done')).toBeInTheDocument();
+
+    const deactivatedRow = screen.getByText('Dana Deactivated').closest('tr');
+    expect(within(deactivatedRow!).getByText('1/4')).toBeInTheDocument();
+
+    const ownRow = screen.getByText('Ada Admin').closest('tr');
+    expect(within(ownRow!).getByText('—')).toBeInTheDocument();
   });
 
   it('hides the Deactivate button on your own row but shows it on the agent row', async () => {

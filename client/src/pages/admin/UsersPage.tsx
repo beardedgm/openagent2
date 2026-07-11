@@ -3,7 +3,7 @@ import { isAxiosError } from 'axios';
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useInvitations, useMe, useSettings, useUsers } from '../../api/hooks';
+import { useInvitations, useMe, useOnboardingStatus, useSettings, useUsers } from '../../api/hooks';
 import type { Role } from '../../api/types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -38,6 +38,8 @@ export function UsersPage() {
   const { data: settings } = useSettings();
   const { data: users, isLoading } = useUsers(true);
   const { data: invitations } = useInvitations();
+  const { data: onboardingStatuses } = useOnboardingStatus(true);
+  const obByUser = new Map((onboardingStatuses ?? []).map((s) => [s.userId, s]));
 
   const isBroker = me?.role === 'broker';
 
@@ -257,6 +259,7 @@ export function UsersPage() {
                 <th style={{ padding: 'var(--space-2)' }}>Role</th>
                 <th style={{ padding: 'var(--space-2)' }}>Office</th>
                 <th style={{ padding: 'var(--space-2)' }}>Status</th>
+                <th style={{ padding: 'var(--space-2)' }}>Onboarding</th>
                 <th style={{ padding: 'var(--space-2)' }}>Actions</th>
               </tr>
             </thead>
@@ -336,6 +339,19 @@ export function UsersPage() {
                       <Badge tone={u.status === 'active' ? 'success' : 'neutral'}>
                         {u.status === 'active' ? 'Active' : 'Deactivated'}
                       </Badge>
+                    </td>
+                    <td style={{ padding: 'var(--space-2)' }}>
+                      {(() => {
+                        const ob = obByUser.get(u.id);
+                        if (!ob) return <span style={{ color: 'var(--color-text-muted)' }}>—</span>;
+                        return ob.total > 0 && ob.completed === ob.total ? (
+                          <Badge tone="success">Done</Badge>
+                        ) : (
+                          <Badge tone="accent">
+                            {ob.completed}/{ob.total}
+                          </Badge>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding: 'var(--space-2)' }}>
                       {!isOwnRow && u.status === 'active' && (

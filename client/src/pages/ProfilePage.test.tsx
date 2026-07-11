@@ -100,6 +100,15 @@ describe('ProfilePage', () => {
     );
   });
 
+  it('defaults eventReminders to unchecked (opt-in) while other prefs default to checked', async () => {
+    render(wrap());
+
+    expect(await screen.findByRole('checkbox', { name: /important announcements/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /task due-soon reminders/i })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /event reminders/i })).not.toBeChecked();
+    expect(screen.getByText('Overdue-task emails are always sent.')).toBeInTheDocument();
+  });
+
   it('unchecks the email preference optimistically before the server responds', async () => {
     patchMock.mockImplementation(() => new Promise(() => {})); // never resolves
 

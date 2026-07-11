@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
-import { useSettings } from '../../api/hooks';
+import { useMe, useSettings, useTaskTemplates } from '../../api/hooks';
 import type { Settings } from '../../api/types';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -13,6 +13,11 @@ interface OfficeRow {
   name: string;
   address: string;
   timezone: string;
+}
+
+interface ResourceRow {
+  _id?: string;
+  name: string;
 }
 
 const TIMEZONES = [
@@ -42,13 +47,17 @@ const rowInputStyle = {
 
 export function SettingsPage() {
   const qc = useQueryClient();
+  const { data: me } = useMe();
   const { data: settings } = useSettings();
+  const { data: templates } = useTaskTemplates(me?.role === 'broker');
   const [seeded, setSeeded] = useState(false);
 
   const [brandName, setBrandName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#1d4ed8');
   const [offices, setOffices] = useState<OfficeRow[]>([]);
   const [rssFeeds, setRssFeeds] = useState<string[]>([]);
+  const [resources, setResources] = useState<ResourceRow[]>([]);
+  const [onboardingTaskTemplateId, setOnboardingTaskTemplateId] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,6 +66,8 @@ export function SettingsPage() {
     setPrimaryColor(s.primaryColor);
     setOffices(s.officeLocations.map((o) => ({ _id: o._id, name: o.name, address: o.address, timezone: o.timezone })));
     setRssFeeds([...s.rssFeeds]);
+    setResources(s.reservableResources.map((r) => ({ _id: r._id, name: r.name })));
+    setOnboardingTaskTemplateId(s.onboardingTaskTemplateId ?? '');
   }
 
   useEffect(() => {
@@ -118,6 +129,14 @@ export function SettingsPage() {
     setRssFeeds((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function updateResource(index: number, patch: Partial<ResourceRow>) {
+    setResources((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  function removeResource(index: number) {
+    setResources((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function handleSave() {
     // canSave guarantees the hex is valid here, so primaryColor is always included.
     save.mutate({
@@ -125,6 +144,8 @@ export function SettingsPage() {
       primaryColor,
       officeLocations: offices,
       rssFeeds: rssFeeds.map((f) => f.trim()),
+      reservableResources: resources,
+      onboardingTaskTemplateId: onboardingTaskTemplateId || null,
     });
   }
 
@@ -268,6 +289,50 @@ export function SettingsPage() {
           >
             Add office
           </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 style={{ fontSize: 18, marginBottom: 'var(--space-3)' }}>Reservable resources</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {resources.map((resource, index) => (
+            <div key={resource._id ?? `new-${index}`} style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <input
+                aria-label={`Resource ${index + 1} name`}
+                value={resource.name}
+                onChange={(e) => updateResource(index, { name: e.target.value })}
+                placeholder="Name"
+                style={{ ...rowInputStyle, flex: '1 1 220px' }}
+              />
+              <Button variant="secondary" onClick={() => removeResource(index)}>
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <Button variant="secondary" onClick={() => setResources((prev) => [...prev, { name: '' }])}>
+            Add resource
+          </Button>
+        </div>
+
+        <div style={{ display: 'grid', gap: 'var(--space-1)', marginTop: 'var(--space-4)' }}>
+          <label htmlFor="onboarding-template" style={{ fontWeight: 600, fontSize: 14 }}>
+            Onboarding template
+          </label>
+          <select
+            id="onboarding-template"
+            value={onboardingTaskTemplateId}
+            onChange={(e) => setOnboardingTaskTemplateId(e.target.value)}
+            style={{ ...rowInputStyle, maxWidth: 320 }}
+          >
+            <option value="">None</option>
+            {templates?.map((tpl) => (
+              <option key={tpl.id} value={tpl.id}>
+                {tpl.name}
+              </option>
+            ))}
+          </select>
         </div>
       </Card>
 

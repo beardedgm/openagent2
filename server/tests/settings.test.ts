@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { TaskTemplate } from '../src/models/TaskTemplate.js';
 import { User } from '../src/models/User.js';
 import { hashPassword } from '../src/utils/password.js';
 
@@ -78,5 +79,21 @@ describe('settings', () => {
     expect(edited.status).toBe(200);
     expect(edited.body.settings.reservableResources[0]._id).toBe(firstId);
     expect(edited.body.settings.reservableResources[1].name).toBe('Training Room B');
+  });
+
+  it('validates onboardingTaskTemplateId against real templates and allows clearing it', async () => {
+    const broker = await loginAs(app, 'b4@x.com', 'broker');
+
+    const bogus = await broker.patch('/api/v1/admin/settings').send({ onboardingTaskTemplateId: '64b0000000000000000000ff' });
+    expect(bogus.status).toBe(400);
+
+    const tpl = await TaskTemplate.create({ name: 'Onboarding', items: [{ title: 'Sign policies' }] });
+    const real = await broker.patch('/api/v1/admin/settings').send({ onboardingTaskTemplateId: tpl.id });
+    expect(real.status).toBe(200);
+    expect(real.body.settings.onboardingTaskTemplateId).toBe(tpl.id);
+
+    const cleared = await broker.patch('/api/v1/admin/settings').send({ onboardingTaskTemplateId: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.settings.onboardingTaskTemplateId).toBeNull();
   });
 });

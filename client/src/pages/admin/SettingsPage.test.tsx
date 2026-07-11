@@ -37,6 +37,8 @@ const serverSettings = {
   welcomeMessage: '',
   quickLinks: [],
   homepageLayout: [],
+  reservableResources: [],
+  onboardingTaskTemplateId: null,
 };
 
 interface OfficeBody {
@@ -60,6 +62,7 @@ describe('SettingsPage', () => {
     getMock.mockImplementation(async (url: string) => {
       if (url === '/auth/me') return { data: { user: brokerUser } };
       if (url === '/settings') return { data: { settings: serverSettings } };
+      if (url === '/task-templates') return { data: { templates: [] } };
       throw new Error(`Unhandled GET ${url}`);
     });
     postMock.mockReset();
