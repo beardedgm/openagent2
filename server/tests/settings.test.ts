@@ -54,4 +54,15 @@ describe('settings', () => {
     expect(res.status).toBe(200);
     expect(res.body.settings.homepageLayout).toContain('welcome');
   });
+
+  it('broker manages reservable resources', async () => {
+    const broker = await loginAs(app, 'b3@x.com', 'broker');
+    const res = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ reservableResources: [{ name: 'Conference Room A' }, { name: 'Training Room' }] });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.reservableResources).toHaveLength(2);
+    expect(res.body.settings.reservableResources[0].name).toBe('Conference Room A');
+    expect(res.body.settings.reservableResources[0]._id).toBeTruthy(); // events reference this id
+  });
 });
