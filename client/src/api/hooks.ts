@@ -1,6 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Invitation, NotificationsResponse, Post, PostComment, PublicSettings, Settings, User } from './types';
+import type {
+  CalendarEventInfo,
+  EventOccurrence,
+  Invitation,
+  NotificationsResponse,
+  OnboardingProgress,
+  Post,
+  PostComment,
+  PublicSettings,
+  RsvpSummary,
+  Settings,
+  TaskInfo,
+  TaskMatrixRow,
+  TaskTemplateInfo,
+  User,
+} from './types';
 
 export function useMe() {
   return useQuery({
@@ -89,5 +104,69 @@ export function useLogout() {
   return useMutation({
     mutationFn: async () => api.post('/auth/logout'),
     onSuccess: () => qc.clear(),
+  });
+}
+
+export function useEvents(fromIso: string, toIso: string) {
+  return useQuery({
+    queryKey: ['events', { fromIso, toIso }],
+    queryFn: async () =>
+      (
+        await api.get<{ occurrences: EventOccurrence[] }>(
+          `/events?from=${encodeURIComponent(fromIso)}&to=${encodeURIComponent(toIso)}`,
+        )
+      ).data.occurrences,
+    // Prev/next changes the query key every step; keep the old grid on screen while the
+    // new range loads instead of blanking the calendar on every navigation.
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useEvent(id: string | undefined) {
+  return useQuery({
+    queryKey: ['events', id],
+    queryFn: async () =>
+      (await api.get<{ event: CalendarEventInfo; rsvpSummary?: RsvpSummary }>(`/events/${id}`)).data,
+    enabled: !!id,
+  });
+}
+
+export function useTasks(scope: 'mine' | 'all') {
+  return useQuery({
+    queryKey: ['tasks', { scope }],
+    queryFn: async () => (await api.get<{ tasks: TaskInfo[] }>(`/tasks?scope=${scope}`)).data.tasks,
+  });
+}
+
+export function useTask(id: string | undefined) {
+  return useQuery({
+    queryKey: ['tasks', id],
+    queryFn: async () => (await api.get<{ task: TaskInfo; matrix?: TaskMatrixRow[] }>(`/tasks/${id}`)).data,
+    enabled: !!id,
+  });
+}
+
+export function useTaskTemplates(enabled = true) {
+  return useQuery({
+    queryKey: ['task-templates'],
+    queryFn: async () => (await api.get<{ templates: TaskTemplateInfo[] }>('/task-templates')).data.templates,
+    enabled,
+  });
+}
+
+export function useMyOnboarding() {
+  return useQuery({
+    queryKey: ['onboarding', 'mine'],
+    queryFn: async () => (await api.get<OnboardingProgress>('/tasks/onboarding/mine')).data,
+  });
+}
+
+export function useOnboardingStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ['onboarding', 'status'],
+    queryFn: async () =>
+      (await api.get<{ statuses: ({ userId: string } & OnboardingProgress)[] }>('/tasks/onboarding/status')).data
+        .statuses,
+    enabled,
   });
 }

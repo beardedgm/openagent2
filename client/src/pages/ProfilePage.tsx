@@ -27,9 +27,14 @@ const ROLE_TONE: Record<Role, 'accent' | 'success' | 'neutral'> = {
   external: 'neutral',
 };
 
-const EMAIL_PREFS: { key: string; label: string; adminOnly?: boolean }[] = [
+const EMAIL_PREFS: { key: string; label: string; adminOnly?: boolean; defaultOn?: boolean }[] = [
   { key: 'postPublished', label: 'Important announcements' },
   { key: 'invitationAccepted', label: 'An invitation I sent is accepted', adminOnly: true },
+  { key: 'taskAssigned', label: 'Task assignments (High priority or due soon)' },
+  { key: 'taskDueSoon', label: 'Task due-soon reminders' },
+  { key: 'mandatoryEvent', label: 'Mandatory event announcements' },
+  // Opt-IN (PRD 5.4): event reminders are off unless enabled.
+  { key: 'eventReminders', label: 'Event reminders (24h and 1h before)', defaultOn: false },
 ];
 
 export function ProfilePage() {
@@ -270,13 +275,16 @@ export function ProfilePage() {
             >
               <input
                 type="checkbox"
-                checked={user.emailPrefs[p.key] ?? true}
+                checked={user.emailPrefs[p.key] ?? p.defaultOn !== false}
                 onChange={(e) => updatePrefs.mutate({ ...user.emailPrefs, [p.key]: e.target.checked })}
                 style={{ width: 18, height: 18 }}
               />
               {p.label}
             </label>
           ))}
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginTop: 'var(--space-2)' }}>
+            Overdue-task emails are always sent.
+          </p>
           {prefsErrorMessage && (
             <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 'var(--space-2)' }}>
               {prefsErrorMessage}

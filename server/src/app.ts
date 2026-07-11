@@ -10,13 +10,16 @@ import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
+import { eventsRouter } from './routes/events.js';
 import { feedRouter } from './routes/feed.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { postsRouter } from './routes/posts.js';
 import { adminSettingsRouter, settingsRouter } from './routes/settings.js';
+import { taskTemplatesRouter } from './routes/taskTemplates.js';
+import { tasksRouter } from './routes/tasks.js';
 import { uploadsRouter } from './routes/uploads.js';
 import { usersRouter } from './routes/users.js';
-import { LOCAL_UPLOAD_DIR } from './services/storage.js';
+import { LOCAL_PUBLIC_DIR } from './services/storage.js';
 
 declare module 'express-session' {
   interface SessionData {
@@ -74,7 +77,14 @@ export function createApp(): express.Express {
   app.use('/api/v1/admin/settings', adminSettingsRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/feed', feedRouter);
-  if (env.STORAGE_DRIVER === 'local') app.use('/files', express.static(LOCAL_UPLOAD_DIR));
+  app.use('/api/v1/events', eventsRouter);
+  app.use('/api/v1/tasks', tasksRouter);
+  app.use('/api/v1/task-templates', taskTemplatesRouter);
+  // The static mount serves ONLY uploads/public/ — private files live in a disjoint
+  // subtree (uploads/private/) that is not under the served root, so no encoding or
+  // traversal trick can reach them. (Dev files uploaded before this split live at the
+  // old uploads/ root and need re-uploading — dev-only, acceptable.)
+  if (env.STORAGE_DRIVER === 'local') app.use('/files', express.static(LOCAL_PUBLIC_DIR));
 
   if (prod) {
     // compiled file lives at server/dist/src/app.js → repo root is ../../..

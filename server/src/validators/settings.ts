@@ -14,6 +14,11 @@ export const updateSettingsSchema = z.object({
     )
     .max(50)
     .optional(),
+  reservableResources: z
+    .array(z.object({ _id: z.string().optional(), name: z.string().trim().min(1).max(80) }))
+    .max(50)
+    .optional(),
+  onboardingTaskTemplateId: z.string().nullable().optional(),
   rssFeeds: z.array(z.string().url()).max(10).optional(),
   welcomeMessage: z.string().max(20000).optional(),
   quickLinks: z.array(z.object({ label: z.string().min(1).max(60), url: z.string().url() })).max(12).optional(),

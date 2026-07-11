@@ -47,8 +47,9 @@ export async function getFeed(
   const isAdmin = user.role === 'broker' || user.role === 'officeAdmin';
   const officeScope = isAdmin ? {} : { $or: [{ officeId: null }, { officeId: user.officeId }] };
 
+  const userScope = { $or: [{ userId: null }, { userId: user.id }] };
   const internalFilter: Record<string, unknown> = {
-    $and: [officeScope, { $or: [{ pinnedUntil: null }, { pinnedUntil: { $lte: now } }] }],
+    $and: [officeScope, userScope, { $or: [{ pinnedUntil: null }, { pinnedUntil: { $lte: now } }] }],
   };
   if (before) internalFilter.createdAt = { $lt: before };
 
@@ -64,7 +65,7 @@ export async function getFeed(
     // Pinned block appears on the first page only.
     before || filter === 'external'
       ? []
-      : ActivityEvent.find({ $and: [officeScope, { pinnedUntil: { $gt: now } }] }).sort({ createdAt: -1 }),
+      : ActivityEvent.find({ $and: [officeScope, userScope, { pinnedUntil: { $gt: now } }] }).sort({ createdAt: -1 }),
   ]);
 
   const items = [...internal.map(toInternalItem), ...external.map(toExternalItem)]

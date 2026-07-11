@@ -5,6 +5,7 @@ export async function emitActivity(input: {
   message: string;
   link?: string;
   officeId?: string | null;
+  userId?: string | null;
   actorId?: string | null;
 }): Promise<void> {
   await ActivityEvent.create({
@@ -12,6 +13,7 @@ export async function emitActivity(input: {
     message: input.message,
     link: input.link ?? '',
     officeId: input.officeId ?? null,
+    userId: input.userId ?? null,
     actorId: input.actorId ?? null,
   });
 }

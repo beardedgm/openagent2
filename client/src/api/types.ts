@@ -31,6 +31,8 @@ export interface Settings {
   welcomeMessage: string;
   quickLinks: { label: string; url: string }[];
   homepageLayout: string[];
+  reservableResources: ReservableResource[];
+  onboardingTaskTemplateId: string | null;
 }
 
 export interface PublicSettings {
@@ -103,4 +105,85 @@ export interface FeedResponse {
   pinned: FeedItem[];
   items: FeedItem[];
   nextCursor: string | null;
+}
+
+export type RsvpResponse = 'yes' | 'no' | 'maybe';
+export type EventRecurrence = 'none' | 'daily' | 'weekly' | 'monthly';
+export type TaskPriority = 'High' | 'Medium' | 'Low';
+
+export interface CalendarEventInfo {
+  id: string;
+  title: string;
+  descriptionHtml: string;
+  kind: 'office' | 'personal';
+  createdBy: string;
+  officeId: string | null;
+  startAt: string;
+  endAt: string;
+  allDay: boolean;
+  location: string;
+  recurrence: EventRecurrence;
+  recurrenceUntil: string | null;
+  rsvpEnabled: boolean;
+  mandatory: boolean;
+  resourceId: string | null;
+  myRsvp: RsvpResponse | null;
+  createdAt: string;
+}
+
+export interface EventOccurrence {
+  event: CalendarEventInfo;
+  startAt: string;
+  endAt: string;
+}
+
+export interface RsvpSummary {
+  yes: string[];
+  no: string[];
+  maybe: string[];
+}
+
+export interface TaskAttachmentInfo {
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+export interface TaskInfo {
+  id: string;
+  title: string;
+  descriptionHtml: string;
+  createdBy: string;
+  priority: TaskPriority;
+  dueAt: string | null;
+  attachments: TaskAttachmentInfo[];
+  recurrence: EventRecurrence;
+  isOnboarding: boolean;
+  myCompletion: { completedAt: string | null; note: string } | null;
+  counts: { total: number; completed: number };
+  createdAt: string;
+}
+
+export interface TaskMatrixRow {
+  userId: string;
+  displayName: string;
+  completedAt: string | null;
+  note: string;
+}
+
+export interface TaskTemplateInfo {
+  id: string;
+  name: string;
+  items: { title: string; descriptionHtml: string; priority: TaskPriority; dueInDays: number | null }[];
+  createdAt: string;
+}
+
+export interface OnboardingProgress {
+  total: number;
+  completed: number;
+}
+
+export interface ReservableResource {
+  _id: string;
+  name: string;
 }

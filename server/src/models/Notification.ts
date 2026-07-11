@@ -1,8 +1,14 @@
 import mongoose from 'mongoose';
 
-// Stage 3+ appends task/calendar types (taskAssigned, taskDueSoon, taskOverdue,
-// mandatoryEvent, bookmarkedResource) — extend this enum, never hardcode strings.
-export const NOTIFICATION_TYPES = ['invitationAccepted', 'postPublished'] as const;
+// Stage 4 appends bookmarkedResource — extend this enum, never hardcode strings.
+export const NOTIFICATION_TYPES = [
+  'invitationAccepted',
+  'postPublished',
+  'taskAssigned',
+  'taskDueSoon',
+  'taskOverdue',
+  'mandatoryEvent',
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 const notificationSchema = new mongoose.Schema(

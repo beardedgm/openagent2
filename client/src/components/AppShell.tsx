@@ -1,4 +1,4 @@
-import { Bell, LayoutDashboard, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, LayoutDashboard, LayoutTemplate, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -89,6 +89,14 @@ export function AppShell() {
             <Newspaper size={18} />
             Feed
           </NavLink>
+          <NavLink to="/calendar" style={({ isActive }) => navLinkStyle(isActive)}>
+            <CalendarDays size={18} />
+            Calendar
+          </NavLink>
+          <NavLink to="/tasks" style={({ isActive }) => navLinkStyle(isActive)}>
+            <ClipboardList size={18} />
+            Tasks
+          </NavLink>
           {isAdmin && (
             <>
               <div
@@ -109,10 +117,16 @@ export function AppShell() {
                 Users
               </NavLink>
               {isBroker && (
-                <NavLink to="/admin/settings" style={({ isActive }) => navLinkStyle(isActive)}>
-                  <Settings size={18} />
-                  Settings
-                </NavLink>
+                <>
+                  <NavLink to="/admin/settings" style={({ isActive }) => navLinkStyle(isActive)}>
+                    <Settings size={18} />
+                    Settings
+                  </NavLink>
+                  <NavLink to="/admin/templates" style={({ isActive }) => navLinkStyle(isActive)}>
+                    <LayoutTemplate size={18} />
+                    Templates
+                  </NavLink>
+                </>
               )}
             </>
           )}

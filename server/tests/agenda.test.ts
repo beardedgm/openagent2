@@ -23,7 +23,7 @@ function captureHandlers() {
 describe('job registry', () => {
   it('registers publish-post and poll-rss', () => {
     const handlers = captureHandlers();
-    expect([...handlers.keys()].sort()).toEqual(['poll-rss', 'publish-post']);
+    expect([...handlers.keys()].sort()).toEqual(['event-reminders', 'poll-rss', 'publish-post', 'task-sweep']);
   });
 
   it('publish-post handler announces a due post exactly once', async () => {
