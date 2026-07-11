@@ -88,3 +88,19 @@ export interface PostComment {
   author: PostAuthor | null;
   createdAt: string;
 }
+
+export interface FeedItem {
+  id: string;
+  kind: 'internal' | 'external';
+  title: string;
+  link: string;
+  source?: string;
+  pinnedUntil?: string | null;
+  date: string;
+}
+
+export interface FeedResponse {
+  pinned: FeedItem[];
+  items: FeedItem[];
+  nextCursor: string | null;
+}

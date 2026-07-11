@@ -4,6 +4,7 @@ import { RequireAuth } from './components/RequireAuth';
 import { BoardPage } from './pages/BoardPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DirectoryPage } from './pages/DirectoryPage';
+import { FeedPage } from './pages/FeedPage';
 import { LoginPage } from './pages/LoginPage';
 import { PostEditorPage } from './pages/PostEditorPage';
 import { PostPage } from './pages/PostPage';
@@ -45,6 +46,7 @@ export function App() {
             </RequireAuth>
           }
         />
+        <Route path="/feed" element={<FeedPage />} />
         <Route
           path="/admin/users"
           element={
