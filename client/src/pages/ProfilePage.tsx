@@ -27,6 +27,11 @@ const ROLE_TONE: Record<Role, 'accent' | 'success' | 'neutral'> = {
   external: 'neutral',
 };
 
+const EMAIL_PREFS: { key: string; label: string; adminOnly?: boolean }[] = [
+  { key: 'postPublished', label: 'Important announcements' },
+  { key: 'invitationAccepted', label: 'An invitation I sent is accepted', adminOnly: true },
+];
+
 export function ProfilePage() {
   const { id } = useParams();
   const { data: user, isLoading, error } = useUser(id);
@@ -52,6 +57,14 @@ export function ProfilePage() {
       await qc.invalidateQueries({ queryKey: ['users'] });
       await qc.invalidateQueries({ queryKey: ['me'] });
       setEditing(false);
+    },
+  });
+
+  const updatePrefs = useMutation({
+    mutationFn: (emailPrefs: Record<string, boolean>) => api.patch(`/users/${id}`, { emailPrefs }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['users', id] });
+      await qc.invalidateQueries({ queryKey: ['me'] });
     },
   });
 
@@ -227,6 +240,29 @@ export function ProfilePage() {
               </Button>
             </div>
           </form>
+        </Card>
+      )}
+
+      {isSelf && me && (
+        <Card>
+          <h2 style={{ fontSize: 18, marginBottom: 'var(--space-2)' }}>Email notifications</h2>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 14, marginBottom: 'var(--space-3)' }}>
+            In-app notifications are always on. Choose which ones also send an email.
+          </p>
+          {EMAIL_PREFS.filter((p) => !p.adminOnly || me.role === 'broker' || me.role === 'officeAdmin').map((p) => (
+            <label
+              key={p.key}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44, fontSize: 14 }}
+            >
+              <input
+                type="checkbox"
+                checked={user.emailPrefs[p.key] ?? true}
+                onChange={(e) => updatePrefs.mutate({ ...user.emailPrefs, [p.key]: e.target.checked })}
+                style={{ width: 18, height: 18 }}
+              />
+              {p.label}
+            </label>
+          ))}
         </Card>
       )}
     </div>
