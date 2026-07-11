@@ -116,6 +116,9 @@ export async function createEvent(input: EventInput, creator: UserDoc): Promise<
   enforceKindRules(event, creator);
   if (event.resourceId) {
     await assertResourceExists(String(event.resourceId));
+    // Check-then-save race: two simultaneous saves can both pass this check (same accepted
+    // trade-off as setPinned — single brokerage, low collision odds; an overlapping pair is
+    // visible on the calendar and fixable by hand).
     await assertResourceFree(event);
   }
   await event.save();
@@ -130,10 +133,11 @@ export async function updateEvent(id: string, input: EventInput, user: UserDoc):
   const wasMandatory = event.mandatory;
   applyInput(event, input);
   enforceKindRules(event, user);
-  if (event.resourceId) {
-    await assertResourceExists(String(event.resourceId));
-    await assertResourceFree(event, event.id);
-  }
+  // Existence is re-validated only when the caller changes the resource — an event holding
+  // a since-removed resource must stay editable (Settings documents resources as removable).
+  // The conflict re-check still runs on ANY edit (time moves can create new overlaps).
+  if (input.resourceId !== undefined && event.resourceId) await assertResourceExists(String(event.resourceId));
+  if (event.resourceId) await assertResourceFree(event, event.id);
   await event.save();
   // Newly-flagged mandatory on an existing event announces once.
   if (event.kind === 'office' && event.mandatory && !wasMandatory) await announceMandatory(event, user);

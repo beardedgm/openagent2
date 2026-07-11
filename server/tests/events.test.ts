@@ -162,4 +162,66 @@ describe('calendarService', () => {
     await deleteEvent(personal.id, agent);
     expect(await CalendarEvent.findById(personal.id)).toBeNull();
   });
+
+  it('updateEvent re-checks resource conflicts when times move', async () => {
+    const broker = await makeUser('c11@x.com', 'broker');
+    const settings = await getSettings();
+    settings.reservableResources.push({ name: 'Room B' } as never);
+    await settings.save();
+    const roomId = String(settings.reservableResources[0]._id);
+
+    await createEvent(
+      {
+        title: 'Weekly standup',
+        kind: 'office',
+        startAt: '2026-08-03T15:00:00.000Z',
+        endAt: '2026-08-03T16:00:00.000Z',
+        recurrence: 'weekly',
+        resourceId: roomId,
+      },
+      broker,
+    );
+    // A free slot the next day…
+    const movable = await createEvent(
+      { title: 'Movable', kind: 'office', startAt: '2026-08-04T15:00:00.000Z', endAt: '2026-08-04T16:00:00.000Z', resourceId: roomId },
+      broker,
+    );
+    // …moved onto a later weekly occurrence → conflict re-check rejects.
+    await expect(
+      updateEvent(movable.id, { startAt: '2026-08-10T15:30:00.000Z', endAt: '2026-08-10T16:30:00.000Z' }, broker),
+    ).rejects.toThrow(/reserved/i);
+  });
+
+  it('updateEvent announces once when mandatory is newly flagged', async () => {
+    const broker = await makeUser('c12@x.com', 'broker');
+    const agent = await makeUser('c13@x.com', 'agent');
+    const e = await createEvent(
+      { title: 'Retreat', kind: 'office', startAt: '2026-08-20T15:00:00.000Z', endAt: '2026-08-20T16:00:00.000Z' },
+      broker,
+    );
+    expect(await ActivityEvent.countDocuments({ type: 'eventCreated' })).toBe(0); // non-mandatory never feeds
+    await updateEvent(e.id, { mandatory: true }, broker);
+    expect(await ActivityEvent.countDocuments({ type: 'eventCreated' })).toBe(1);
+    expect(await Notification.countDocuments({ userId: agent.id, type: 'mandatoryEvent' })).toBe(1);
+    // Further edits of an already-mandatory event do not re-announce.
+    await updateEvent(e.id, { title: 'x' }, broker);
+    expect(await ActivityEvent.countDocuments({ type: 'eventCreated' })).toBe(1);
+    expect(await Notification.countDocuments({ userId: agent.id, type: 'mandatoryEvent' })).toBe(1);
+  });
+
+  it('an event holding a since-removed resource stays editable', async () => {
+    const broker = await makeUser('c14@x.com', 'broker');
+    const settings = await getSettings();
+    settings.reservableResources.push({ name: 'Doomed Room' } as never);
+    await settings.save();
+    const roomId = String(settings.reservableResources[0]._id);
+    const e = await createEvent(
+      { title: 'Holds room', kind: 'office', startAt: '2026-08-21T15:00:00.000Z', endAt: '2026-08-21T16:00:00.000Z', resourceId: roomId },
+      broker,
+    );
+    settings.reservableResources = [] as never;
+    await settings.save();
+    const updated = await updateEvent(e.id, { title: 'Renamed' }, broker);
+    expect(updated.title).toBe('Renamed');
+  });
 });
