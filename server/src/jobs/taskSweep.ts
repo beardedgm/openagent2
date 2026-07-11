@@ -36,6 +36,9 @@ async function sweepDueSoon(now: Date): Promise<void> {
 }
 
 async function sweepOverdue(now: Date): Promise<void> {
+  // No lower time floor: scans all historical overdue-incomplete-unlatched tasks each
+  // sweep — bounded and cheap at single-brokerage scale with 2y retention (latch keeps
+  // it one notice per user ever).
   const tasks = await Task.find({
     dueAt: { $lt: now },
     completions: { $elemMatch: { completedAt: null, overdueNotifiedAt: null } },
@@ -77,6 +80,8 @@ async function safeNotify(
 }
 
 async function sweepRecurrence(now: Date): Promise<void> {
+  // Advances anchor to sweep-time now (drift under late execution, but no backfill
+  // storm after outages — deliberate, mirrors the reminder sweeper's skip-by-design).
   // Advance dates are constants relative to `now` — computed once in JS (not inside
   // the aggregation pipeline) so the monthly branch can use addMonthsClamped, which
   // clamps end-of-month overflow (Jan 31 + 1mo = Feb 28) the way a raw $dateAdd /
@@ -110,7 +115,10 @@ async function sweepRecurrence(now: Date): Promise<void> {
     if (!parent) return;
     try {
       const creator = await User.findById(parent.createdBy);
-      if (!creator) continue;
+      if (!creator) {
+        logger.warn({ taskId: parent.id }, 'recurring task creator missing — series skipped this period');
+        continue;
+      }
       const dueOffset = parent.dueAt ? parent.dueAt.getTime() - (parent.get('createdAt') as Date).getTime() : null;
       await createTask(
         {

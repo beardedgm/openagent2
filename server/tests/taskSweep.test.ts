@@ -89,6 +89,31 @@ describe('sweepTasks', () => {
     expect(freshParent.nextRecurrenceAt!.getTime()).toBeGreaterThan(Date.now());
   });
 
+  it('spawned instances keep the parent created->due offset relative to sweep time', async () => {
+    const broker = await makeUser('s12@x.com', 'broker');
+    const parent = await createTask(
+      {
+        title: 'Offset report',
+        audience: { type: 'all' },
+        recurrence: 'weekly',
+        dueAt: new Date(Date.now() + 4 * 86_400_000).toISOString(),
+      },
+      broker,
+    );
+    await Task.updateOne({ _id: parent.id }, { $set: { nextRecurrenceAt: new Date(Date.now() - 60_000) } });
+    // Compute the expected offset from the PERSISTED parent fields — Mongo's
+    // stored createdAt/dueAt are what the sweeper reads back.
+    const freshParent = (await Task.findById(parent.id))!;
+    const offset = freshParent.dueAt!.getTime() - (freshParent.get('createdAt') as Date).getTime();
+    const sweepStart = Date.now();
+    await sweepTasks();
+    const spawned = await Task.find({ title: 'Offset report', _id: { $ne: parent.id } });
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0].dueAt).not.toBeNull();
+    // The sweeper's own `now` is captured a few ms after sweepStart — allow +-5s.
+    expect(Math.abs(spawned[0].dueAt!.getTime() - (sweepStart + offset))).toBeLessThanOrEqual(5000);
+  });
+
   it('advances a monthly recurrence via addMonthsClamped, not a raw setUTCMonth overflow', async () => {
     const broker = await makeUser('s11@x.com', 'broker');
     const parent = await createTask({ title: 'Monthly review', audience: { type: 'all' }, recurrence: 'monthly' }, broker);
