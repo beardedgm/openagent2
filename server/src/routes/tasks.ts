@@ -1,9 +1,11 @@
 import { Router, type Request } from 'express';
+import multer from 'multer';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { validate } from '../middleware/validate.js';
 import { Task, toPublicTask, type TaskDoc } from '../models/Task.js';
+import { makeAttachmentKey, storage } from '../services/storage.js';
 import { completeTask, createTask } from '../services/taskService.js';
 import { completeTaskSchema, createTaskSchema } from '../validators/tasks.js';
 
@@ -13,6 +15,19 @@ tasksRouter.use(requireAuth);
 function isAdmin(role: string): boolean {
   return role === 'broker' || role === 'officeAdmin';
 }
+
+const attachmentUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const MAX_ATTACHMENTS = 5;
+const ATTACHMENT_TYPES = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'text/plain',
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]);
 
 /** Assignees, the creator, and admins can open a task; others see 404. */
 async function loadVisibleTask(req: Request): Promise<TaskDoc> {
@@ -82,5 +97,43 @@ tasksRouter.delete(
     const task = await Task.findByIdAndDelete(req.params.id);
     if (!task) throw new AppError(404, 'Task not found');
     res.json({ ok: true });
+  }),
+);
+
+tasksRouter.post(
+  '/:id/attachments',
+  requireRole('officeAdmin'),
+  attachmentUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    const task = await loadVisibleTask(req);
+    const file = req.file;
+    if (!file) throw new AppError(400, 'File is required');
+    if (!ATTACHMENT_TYPES.has(file.mimetype)) throw new AppError(400, 'File type not allowed');
+    if (task.attachments.length >= MAX_ATTACHMENTS) throw new AppError(400, 'Maximum of 5 attachments per task');
+    const key = makeAttachmentKey('tasks', file.originalname);
+    await storage.putPrivate(key, file.buffer, file.mimetype);
+    task.attachments.push({
+      key,
+      name: file.originalname.slice(0, 120),
+      size: file.size,
+      contentType: file.mimetype,
+    } as never);
+    await task.save();
+    res.status(201).json({ task: toPublicTask(task, req.user!.id) });
+  }),
+);
+
+tasksRouter.get(
+  '/:id/attachments/:index/download',
+  asyncHandler(async (req, res) => {
+    const task = await loadVisibleTask(req); // assignee/creator/admin — others 404
+    const attachment = task.attachments[Number(req.params.index)];
+    if (!attachment) throw new AppError(404, 'Attachment not found');
+    const target = await storage.resolveDownload(attachment.key, attachment.name);
+    if (target.kind === 'url') {
+      res.redirect(302, target.url); // 15-minute presigned R2 URL
+    } else {
+      res.download(target.path, attachment.name);
+    }
   }),
 );

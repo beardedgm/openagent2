@@ -24,7 +24,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
   if (err instanceof multer.MulterError) {
     res.status(400).json({
-      error: err.code === 'LIMIT_FILE_SIZE' ? 'File is too large (max 5MB)' : 'Upload failed',
+      error: err.code === 'LIMIT_FILE_SIZE' ? 'File is too large' : 'Upload failed',
     });
     return;
   }
