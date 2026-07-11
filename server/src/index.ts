@@ -10,6 +10,8 @@ async function start(): Promise<void> {
   await startAgenda(registerJobs);
   if (env.NODE_ENV === 'production' && !env.TURNSTILE_SECRET_KEY)
     logger.warn('TURNSTILE_SECRET_KEY not set — bot protection is disabled in production');
+  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER === 'r2' && !env.R2_PRIVATE_BUCKET)
+    logger.warn('R2_PRIVATE_BUCKET not set — protected files will live in the PUBLIC bucket and are fetchable by key');
   const app = createApp();
   app.listen(env.PORT, () => logger.info(`listening on :${env.PORT}`));
 

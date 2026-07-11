@@ -12,8 +12,9 @@ export interface StoragePort {
   putPublic(key: string, body: Buffer, contentType: string): Promise<string>;
   /** Stores a protected file. Returns the storage key — protected files have no public URL. */
   putPrivate(key: string, body: Buffer, contentType: string): Promise<string>;
-  /** Resolves a protected key for download. R2: 15-minute presigned GET. Local: disk path. */
-  resolveDownload(key: string): Promise<DownloadTarget>;
+  /** Resolves a protected key for download. R2: 15-minute presigned GET. Local: disk path.
+   * `downloadName` sets the attachment filename on R2; local ignores it (the route sets it). */
+  resolveDownload(key: string, downloadName?: string): Promise<DownloadTarget>;
 }
 
 export const LOCAL_UPLOAD_DIR = join(process.cwd(), 'uploads');
@@ -42,6 +43,10 @@ class LocalStorage implements StoragePort {
 }
 
 class R2Storage implements StoragePort {
+  // Private objects belong in a bucket with NO public domain — sharing the public bucket
+  // makes every key permanently fetchable via R2_PUBLIC_BASE_URL.
+  private privateBucket = env.R2_PRIVATE_BUCKET ?? env.R2_BUCKET;
+
   private client = new S3Client({
     region: 'auto',
     endpoint: env.R2_ENDPOINT,
@@ -60,15 +65,23 @@ class R2Storage implements StoragePort {
 
   async putPrivate(key: string, body: Buffer, contentType: string): Promise<string> {
     await this.client.send(
-      new PutObjectCommand({ Bucket: env.R2_BUCKET, Key: key, Body: body, ContentType: contentType }),
+      new PutObjectCommand({ Bucket: this.privateBucket, Key: key, Body: body, ContentType: contentType }),
     );
     return key;
   }
 
-  async resolveDownload(key: string): Promise<DownloadTarget> {
+  async resolveDownload(key: string, downloadName?: string): Promise<DownloadTarget> {
     const url = await getSignedUrl(
       this.client,
-      new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key }),
+      new GetObjectCommand({
+        Bucket: this.privateBucket,
+        Key: key,
+        ...(downloadName
+          ? {
+              ResponseContentDisposition: `attachment; filename="${downloadName.replace(/[^a-zA-Z0-9._ -]/g, '_')}"`,
+            }
+          : {}),
+      }),
       { expiresIn: SIGNED_URL_TTL_SECONDS },
     );
     return { kind: 'url', url };
@@ -89,8 +102,10 @@ export function makeKey(prefix: string, contentType: string): string {
 }
 
 /** Protected-file key: private/<scope>/<random>/<sanitized original name>. The original
- * name is kept (sanitized) so downloads can carry a human filename. */
+ * name is kept (sanitized) so downloads can carry a human filename. Scope is sanitized
+ * too — defense-in-depth against path traversal from future callers. */
 export function makeAttachmentKey(scope: string, originalName: string): string {
+  const safeScope = scope.replace(/[^a-zA-Z0-9_-]/g, '_') || 'files';
   const safe = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.\.+/g, '_').slice(-80) || 'file';
-  return `private/${scope}/${randomBytes(12).toString('hex')}/${safe}`;
+  return `private/${safeScope}/${randomBytes(12).toString('hex')}/${safe}`;
 }

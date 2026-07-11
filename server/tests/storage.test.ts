@@ -25,4 +25,11 @@ describe('private storage (local driver)', () => {
     expect(key).not.toContain('..');
     expect(key).toMatch(/^private\/tasks\/[a-f0-9]{24}\/[a-zA-Z0-9._-]+$/);
   });
+
+  it('sanitizes hostile scopes in keys', () => {
+    const key = makeAttachmentKey('../evil', 'a.pdf');
+    expect(key).not.toContain('..');
+    expect(key).toMatch(/^private\/[a-zA-Z0-9_-]+\/[a-f0-9]{24}\//);
+    expect(key.split('/')).toHaveLength(4); // no separators beyond private/<scope>/<random>/<name>
+  });
 });
