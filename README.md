@@ -2,7 +2,7 @@
 
 A single-tenant intranet for a real estate brokerage — announcements, shared calendar, resource hub, tasks, and staff onboarding in one workspace. TypeScript MERN monorepo (Express API + React SPA), designed to run for free on Render's free tier, MongoDB Atlas M0, and Cloudflare R2.
 
-**Status:** Stage 1 (Foundation) complete — auth & invitations, user management, staff directory/profiles, brokerage settings & branding, and the admin panel are built and tested. Stages 2–5 (communications, calendar/tasks, resource hub/banners, dashboard & polish) are tracked in [docs/superpowers/plans/2026-07-09-roadmap.md](docs/superpowers/plans/2026-07-09-roadmap.md).
+**Status:** Stage 1 (Foundation) complete — auth & invitations, user management, staff directory/profiles, brokerage settings & branding, and the admin panel are built and tested. Stage 2 (Communications) complete — message board with rich-text announcements and comments, in-app + email notifications, and an activity feed with hourly RSS ingestion are built and tested. Stages 3–5 (calendar/tasks, resource hub/banners, dashboard & polish) are tracked in [docs/superpowers/plans/2026-07-09-roadmap.md](docs/superpowers/plans/2026-07-09-roadmap.md).
 
 ## Quick start
 
@@ -77,4 +77,5 @@ A full deployment runbook lands in Stage 5.
 - [docs/superpowers/specs/2026-07-09-brokerage-workspace-design.md](docs/superpowers/specs/2026-07-09-brokerage-workspace-design.md) — approved design spec & decisions log
 - [docs/superpowers/plans/2026-07-09-roadmap.md](docs/superpowers/plans/2026-07-09-roadmap.md) — five-stage delivery roadmap
 - [docs/superpowers/plans/2026-07-09-stage-1-foundation.md](docs/superpowers/plans/2026-07-09-stage-1-foundation.md) — Stage 1 implementation plan
+- [docs/superpowers/plans/2026-07-10-stage-2-communications.md](docs/superpowers/plans/2026-07-10-stage-2-communications.md) — Stage 2 implementation plan
 - [DESIGN.md](DESIGN.md) — authoritative UI/UX reference
