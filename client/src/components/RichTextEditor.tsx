@@ -11,7 +11,7 @@ import {
   ListOrdered,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 
 function ToolbarButton({
@@ -56,6 +56,7 @@ function promptForLink(editor: Editor) {
 
 export function RichTextEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState('');
   const editor = useEditor({
     extensions: [
       // Constrained to the server sanitizer's allowlist (see server/src/utils/sanitizeHtml.ts):
@@ -72,13 +73,28 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
     content: value,
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
+
+  // useEditor captures `content` only at creation; sync late `value` changes (e.g. a page
+  // seeding fetched bodyHtml after mount) into the editor. The getHTML() guard prevents
+  // resetting the document (and the cursor) on the echo of our own onUpdate.
+  useEffect(() => {
+    if (editor && !editor.isDestroyed && value !== editor.getHTML()) {
+      editor.commands.setContent(value, false);
+    }
+  }, [editor, value]);
+
   if (!editor) return null;
 
   const uploadImage = async (file: File) => {
+    setUploadError('');
     const formData = new FormData();
     formData.append('file', file);
-    const { data } = await api.post<{ url: string }>('/uploads/post-image', formData);
-    editor.chain().focus().setImage({ src: data.url }).run();
+    try {
+      const { data } = await api.post<{ url: string }>('/uploads/post-image', formData);
+      editor.chain().focus().setImage({ src: data.url }).run();
+    } catch {
+      setUploadError('Image upload failed — try again');
+    }
   };
 
   return (
@@ -107,6 +123,11 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
           <ImageIcon size={18} />
         </ToolbarButton>
       </div>
+      {uploadError && (
+        <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13, padding: '0 var(--space-3)' }}>
+          {uploadError}
+        </p>
+      )}
       <EditorContent editor={editor} />
       <input
         ref={fileRef}
@@ -115,7 +136,8 @@ export function RichTextEditor({ value, onChange }: { value: string; onChange: (
         hidden
         onChange={(e) => {
           const file = e.currentTarget.files?.[0];
-          if (file) void uploadImage(file);
+          // uploadImage handles its own rejections (catch → uploadError), so no unhandled rejection here.
+          if (file) uploadImage(file);
           e.currentTarget.value = '';
         }}
       />

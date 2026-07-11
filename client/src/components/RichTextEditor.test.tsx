@@ -12,4 +12,11 @@ describe('RichTextEditor', () => {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
     }
   });
+
+  it('syncs editor content when value changes after mount', async () => {
+    const { rerender } = render(<RichTextEditor value="<p>hello</p>" onChange={() => {}} />);
+    expect(await screen.findByText('hello')).toBeInTheDocument();
+    rerender(<RichTextEditor value="<p>world</p>" onChange={() => {}} />);
+    expect(await screen.findByText('world')).toBeInTheDocument();
+  });
 });
