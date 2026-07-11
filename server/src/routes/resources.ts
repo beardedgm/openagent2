@@ -1,14 +1,23 @@
 import { Router, type Request } from 'express';
+import multer from 'multer';
+import { logger } from '../config/logger.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { validate } from '../middleware/validate.js';
 import { Bookmark } from '../models/Bookmark.js';
 import { Resource, toPublicResource, type ResourceDoc } from '../models/Resource.js';
-import { createResource, deleteResource, setFeatured, updateResource } from '../services/resourceService.js';
+import { logEngagement } from '../services/engagementService.js';
+import { announceResource, createResource, deleteResource, setFeatured, updateResource } from '../services/resourceService.js';
+import { makeAttachmentKey, storage } from '../services/storage.js';
+import { fileTypeOf } from '../utils/fileType.js';
 import { createResourceSchema, updateResourceSchema } from '../validators/resources.js';
 
 const PAGE_SIZE = 20;
+
+// PRD 5.6: any file type, 50MB cap. Safety model = private storage + forced attachment
+// disposition on download, NOT a type allowlist (unlike task attachments).
+const fileUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 export const resourcesRouter = Router();
 resourcesRouter.use(requireAuth);
@@ -155,5 +164,64 @@ resourcesRouter.delete(
   asyncHandler(async (req, res) => {
     await Bookmark.deleteOne({ userId: req.user!.id, resourceId: req.params.id });
     res.json({ bookmarked: false });
+  }),
+);
+
+resourcesRouter.post(
+  '/:id/file',
+  requireRole('officeAdmin'),
+  fileUpload.single('file'),
+  asyncHandler(async (req, res) => {
+    const resource = await loadVisibleResource(req);
+    if (resource.kind !== 'file') throw new AppError(400, 'Link resources have no file');
+    if (!req.file) throw new AppError(400, 'File is required');
+    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._ -]/g, '_').slice(-120) || 'file';
+    const key = makeAttachmentKey(`resources_${resource.id}`, req.file.originalname);
+    await storage.putPrivate(key, req.file.buffer, req.file.mimetype);
+    resource.versions.push({
+      key,
+      name: safeName,
+      size: req.file.size,
+      contentType: req.file.mimetype,
+      uploadedBy: req.user!.id,
+    } as never);
+    resource.fileType = fileTypeOf(req.file.mimetype, req.file.originalname);
+    await resource.save();
+    // First file = the moment the resource becomes real for agents (see visibilityFilter).
+    // Announce failures must not fail a persisted upload — the length===1 gate means a
+    // retry would never announce, so log and move on.
+    if (resource.versions.length === 1) {
+      try {
+        await announceResource(resource, req.user!.id);
+      } catch (err) {
+        logger.error(err, 'resource announcement failed');
+      }
+    }
+    const [mapped] = await withBookmarks([resource], req.user!.id, true);
+    res.json({ resource: mapped });
+  }),
+);
+
+resourcesRouter.get(
+  '/:id/download',
+  asyncHandler(async (req, res) => {
+    const resource = await loadVisibleResource(req);
+    if (resource.kind !== 'file') throw new AppError(400, 'Link resources open directly — nothing to download');
+    if (resource.versions.length === 0) throw new AppError(404, 'No file uploaded yet');
+    let version = resource.versions[resource.versions.length - 1];
+    if (typeof req.query.version === 'string' && req.query.version) {
+      if (!isAdmin(req.user!.role)) throw new AppError(403, 'Version history is admin-only');
+      const idx = Number(req.query.version) - 1; // 1-based, matching the admin UI list
+      const picked = resource.versions[idx];
+      if (!picked) throw new AppError(404, 'Version not found');
+      version = picked;
+    }
+    logEngagement('download', req.user!.id, { resourceId: resource.id, name: version.name });
+    const target = await storage.resolveDownload(version.key, version.name);
+    if (target.kind === 'url') {
+      res.redirect(302, target.url); // 15-minute presigned R2 URL
+    } else {
+      res.download(target.path, version.name);
+    }
   }),
 );
