@@ -1,12 +1,13 @@
 import mongoose from 'mongoose';
 
-// Stage 4 appends resourceUploaded.
+// Stage 4 adds resourceUploaded.
 export const ACTIVITY_TYPES = [
   'agentJoined',
   'announcementPosted',
   'taskAssigned',
   'taskCompleted',
   'eventCreated',
+  'resourceUploaded',
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
