@@ -15,6 +15,8 @@ import { feedRouter } from './routes/feed.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { postsRouter } from './routes/posts.js';
 import { adminSettingsRouter, settingsRouter } from './routes/settings.js';
+import { taskTemplatesRouter } from './routes/taskTemplates.js';
+import { tasksRouter } from './routes/tasks.js';
 import { uploadsRouter } from './routes/uploads.js';
 import { usersRouter } from './routes/users.js';
 import { LOCAL_UPLOAD_DIR } from './services/storage.js';
@@ -76,6 +78,8 @@ export function createApp(): express.Express {
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/feed', feedRouter);
   app.use('/api/v1/events', eventsRouter);
+  app.use('/api/v1/tasks', tasksRouter);
+  app.use('/api/v1/task-templates', taskTemplatesRouter);
   if (env.STORAGE_DRIVER === 'local') app.use('/files', express.static(LOCAL_UPLOAD_DIR));
 
   if (prod) {

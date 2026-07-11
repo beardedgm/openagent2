@@ -1,4 +1,6 @@
+import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app.js';
 import { ActivityEvent } from '../src/models/ActivityEvent.js';
 import { EngagementEvent } from '../src/models/EngagementEvent.js';
 import { Notification } from '../src/models/Notification.js';
@@ -6,6 +8,7 @@ import { Task } from '../src/models/Task.js';
 import { TaskTemplate } from '../src/models/TaskTemplate.js';
 import { User } from '../src/models/User.js';
 import { resolveAudience } from '../src/services/audience.js';
+import { hashPassword } from '../src/utils/password.js';
 import { addMonthsClamped } from '../src/utils/recurrence.js';
 
 const { sendEmailMock } = vi.hoisted(() => ({ sendEmailMock: vi.fn(async () => true) }));
@@ -201,5 +204,77 @@ describe('taskService', () => {
     const agent = await makeUser('t22@x.com', 'agent');
     await createTask({ title: 'Direct', audience: { type: 'users', userIds: [agent.id] } }, broker);
     expect(await ActivityEvent.countDocuments({ type: 'taskAssigned' })).toBe(0);
+  });
+});
+
+async function loginAs(app: ReturnType<typeof createApp>, email: string, role: string, officeId: string | null = null) {
+  await User.create({ email, hashedPassword: await hashPassword('Password1!'), role, displayName: email, officeId });
+  const agent = request.agent(app);
+  await agent.post('/api/v1/auth/login').send({ email, password: 'Password1!' });
+  return agent;
+}
+
+describe('task routes', () => {
+  it('admin creates; assignee sees it under scope=mine; matrix is creator/admin-only', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'tr1@x.com', 'broker');
+    const agent = await loginAs(app, 'tr2@x.com', 'agent');
+    const agentUser = (await User.findOne({ email: 'tr2@x.com' }))!;
+
+    expect((await agent.post('/api/v1/tasks').send({ title: 'No', audience: { type: 'all' } })).status).toBe(403);
+    const created = await broker.post('/api/v1/tasks').send({
+      title: 'Compliance form',
+      audience: { type: 'users', userIds: [agentUser.id] },
+      priority: 'Low',
+    });
+    expect(created.status).toBe(201);
+    const id = created.body.task.id;
+
+    const mine = await agent.get('/api/v1/tasks?scope=mine');
+    expect(mine.body.tasks.map((t: { id: string }) => t.id)).toContain(id);
+    expect((await agent.get('/api/v1/tasks?scope=all')).status).toBe(403);
+
+    const asAgent = await agent.get(`/api/v1/tasks/${id}`);
+    expect(asAgent.status).toBe(200);
+    expect(asAgent.body.matrix).toBeUndefined();
+    const asBroker = await broker.get(`/api/v1/tasks/${id}`);
+    expect(asBroker.body.matrix).toHaveLength(1);
+    expect(asBroker.body.matrix[0].displayName).toBe('tr2@x.com');
+    expect(asBroker.body.matrix[0].completedAt).toBeNull();
+  });
+
+  it('non-assignee outsiders get 404 on detail; completion via route with note', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'tr3@x.com', 'broker');
+    const agent = await loginAs(app, 'tr4@x.com', 'agent');
+    const outsider = await loginAs(app, 'tr5@x.com', 'agent');
+    const agentUser = (await User.findOne({ email: 'tr4@x.com' }))!;
+    const id = (
+      await broker.post('/api/v1/tasks').send({ title: 'T', audience: { type: 'users', userIds: [agentUser.id] } })
+    ).body.task.id;
+    expect((await outsider.get(`/api/v1/tasks/${id}`)).status).toBe(404);
+    expect((await outsider.post(`/api/v1/tasks/${id}/complete`).send({})).status).toBe(404); // invisible to non-assignees
+    const done = await agent.post(`/api/v1/tasks/${id}/complete`).send({ note: 'brought it in' });
+    expect(done.status).toBe(200);
+    expect(done.body.task.myCompletion.completedAt).toBeTruthy();
+    expect(done.body.task.myCompletion.note).toBe('brought it in');
+  });
+
+  it('broker manages templates; officeAdmin cannot', async () => {
+    const app = createApp();
+    const broker = await loginAs(app, 'tr6@x.com', 'broker');
+    const admin = await loginAs(app, 'tr7@x.com', 'officeAdmin');
+    expect((await admin.post('/api/v1/task-templates').send({ name: 'X', items: [] })).status).toBe(403);
+    const created = await broker.post('/api/v1/task-templates').send({
+      name: 'Onboarding',
+      items: [{ title: 'Sign policies', dueInDays: 3 }],
+    });
+    expect(created.status).toBe(201);
+    const id = created.body.template.id;
+    const patched = await broker.patch(`/api/v1/task-templates/${id}`).send({ name: 'Onboarding v2' });
+    expect(patched.body.template.name).toBe('Onboarding v2');
+    expect((await broker.get('/api/v1/task-templates')).body.templates).toHaveLength(1);
+    expect((await broker.delete(`/api/v1/task-templates/${id}`)).status).toBe(200);
+    expect((await broker.get('/api/v1/task-templates')).body.templates).toHaveLength(0);
   });
 });
