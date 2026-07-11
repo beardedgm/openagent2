@@ -74,6 +74,9 @@ export async function getFeed(
   return {
     pinned: pinnedDocs.map(toInternalItem),
     items,
+    // Single-date cursor by choice: items sharing the boundary item's exact timestamp
+    // are skipped by the next page's $lt (most likely for RSS items, which often share
+    // pubDates). Accepted for a lossy news feed; notifications use a compound cursor.
     nextCursor: items.length === PAGE_SIZE ? items[items.length - 1].date.toISOString() : null,
   };
 }

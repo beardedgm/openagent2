@@ -80,10 +80,9 @@ async function announceOrSchedule(post: PostDoc): Promise<void> {
     // in-memory copy — in the create/single-actor path the update just succeeded.
     post.notifiedAt = new Date();
   } else {
-    // Task 11: real scheduling must cancel any existing job for this post first
-    // (cancel-then-schedule) — repeated edits would otherwise accumulate duplicate
-    // jobs (harmless today: the latch + publishAt guard make duplicates no-op,
-    // but they'd pile up in agendaJobs).
+    // schedulePostPublish cancels any existing job for this post before scheduling
+    // (cancel-then-schedule, see config/agenda.ts) — repeated edits replace the job
+    // rather than accumulate duplicates in agendaJobs.
     await schedulePostPublish(post.id, post.publishAt);
   }
 }

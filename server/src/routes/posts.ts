@@ -41,6 +41,9 @@ postsRouter.get(
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     const filter: Record<string, unknown> = visibilityFilter(req);
     if (q) filter.$text = { $search: q };
+    // Offset pagination by choice: the board is small, search needs page counts, and
+    // a page drifting under a concurrent pin/publish is acceptable here (the feed,
+    // which grows unboundedly, uses cursors instead).
     const [posts, total] = await Promise.all([
       Post.find(filter)
         .sort({ pinnedAt: -1, publishAt: -1 })
