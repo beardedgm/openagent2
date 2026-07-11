@@ -96,6 +96,7 @@ describe('feed', () => {
     const app = createApp();
     const alice = await loginAs(app, 'f7@x.com', 'agent');
     const bob = await loginAs(app, 'f8@x.com', 'agent');
+    const broker = await loginAs(app, 'f9@x.com', 'broker');
     const aliceUser = (await User.findOne({ email: 'f7@x.com' }))!;
     await ActivityEvent.create({ type: 'taskCompleted', message: 'You completed: File taxes', userId: aliceUser.id });
     await ActivityEvent.create({ type: 'agentJoined', message: 'public event' });
@@ -107,5 +108,8 @@ describe('feed', () => {
     ]);
     const bobFeed = await bob.get('/api/v1/feed');
     expect(bobFeed.body.items.map((i: { title: string }) => i.title)).toEqual(['public event']);
+    // Per-user privacy has NO admin carve-out — brokers don't see others' private events.
+    const brokerFeed = await broker.get('/api/v1/feed');
+    expect(brokerFeed.body.items.map((i: { title: string }) => i.title)).toEqual(['public event']);
   });
 });
