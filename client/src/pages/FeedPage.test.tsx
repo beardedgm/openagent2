@@ -30,6 +30,7 @@ function mockApi(role: string) {
           items: [
             { id: 'i1', kind: 'internal', title: 'Ana joined', link: '/profile/a', date: new Date().toISOString() },
             { id: 'e1', kind: 'external', title: 'Rates dip', link: 'https://news.com/x', source: 'HW News', date: new Date().toISOString() },
+            { id: 'e2', kind: 'external', title: 'Schemeless story', link: '', source: 'Wire', date: new Date().toISOString() },
           ],
           nextCursor: null,
         },
@@ -70,5 +71,12 @@ describe('FeedPage', () => {
     // renders before this one in DOM order and would otherwise be clicked instead.
     await userEvent.click(screen.getAllByRole('button', { name: 'Pin item' })[0]);
     expect(postMock).toHaveBeenCalledWith('/feed/i1/pin');
+  });
+
+  it('renders an external item with an empty link as plain text, not an anchor', async () => {
+    mockApi('agent');
+    render(wrap());
+    expect(await screen.findByText('Schemeless story')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Schemeless story/ })).not.toBeInTheDocument();
   });
 });

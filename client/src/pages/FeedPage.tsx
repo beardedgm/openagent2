@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { ExternalLink, Pin, PinOff } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -56,6 +57,12 @@ export function FeedPage() {
   const pinned = feed.data?.pages[0]?.pinned ?? [];
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
 
+  const pinError = pin.isError
+    ? isAxiosError(pin.error)
+      ? ((pin.error.response?.data as { error?: string })?.error ?? 'Could not update the pin')
+      : 'Could not update the pin'
+    : undefined;
+
   const renderItem = (item: FeedItem, isPinned: boolean) => (
     <div
       key={item.id}
@@ -68,11 +75,11 @@ export function FeedPage() {
       }}
     >
       <div style={{ flex: 1 }}>
-        {item.kind === 'external' ? (
+        {item.kind === 'external' && item.link ? (
           <a href={item.link} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600 }}>
             {item.title} <ExternalLink size={12} aria-hidden style={{ verticalAlign: 'baseline' }} />
           </a>
-        ) : item.link ? (
+        ) : item.kind === 'internal' && item.link ? (
           <Link to={item.link} style={{ fontWeight: 600, color: 'var(--color-text)' }}>
             {item.title}
           </Link>
@@ -125,6 +132,12 @@ export function FeedPage() {
       {feed.isLoading && <Spinner label="Loading feed" />}
 
       {pinned.length > 0 && <Card>{pinned.map((i) => renderItem(i, true))}</Card>}
+
+      {pinError && (
+        <p role="alert" style={{ color: 'var(--color-danger)', fontSize: 13 }}>
+          {pinError}
+        </p>
+      )}
 
       <Card>
         {items.length === 0 && !feed.isLoading && (
