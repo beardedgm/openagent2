@@ -140,12 +140,14 @@ export function SettingsPage() {
     const trimmed = l.url.trim();
     return !(/^https?:\/\//i.test(trimmed) || trimmed.startsWith('/'));
   });
+  const hasEmptyQuickLinkLabel = quickLinks.some((l) => !l.label.trim());
   const canSave =
     hexIsValid &&
     !hasEmptyOfficeName &&
     !hasEmptyResourceName &&
     !hasInvalidFeedUrl &&
     !hasInvalidQuickLinkUrl &&
+    !hasEmptyQuickLinkLabel &&
     !save.isPending;
 
   function updateOffice(index: number, patch: Partial<OfficeRow>) {
@@ -246,7 +248,12 @@ export function SettingsPage() {
           Saved
         </p>
       )}
-      {(hasEmptyOfficeName || hasEmptyResourceName || hasInvalidFeedUrl || hasInvalidQuickLinkUrl || !hexIsValid) && (
+      {(hasEmptyOfficeName ||
+        hasEmptyResourceName ||
+        hasInvalidFeedUrl ||
+        hasInvalidQuickLinkUrl ||
+        hasEmptyQuickLinkLabel ||
+        !hexIsValid) && (
         <p style={{ color: 'var(--color-warning)', fontSize: 13 }}>
           {hasEmptyOfficeName
             ? 'Every office needs a name before you can save.'
@@ -256,7 +263,9 @@ export function SettingsPage() {
                 ? 'Every feed URL must start with http:// or https:// before you can save.'
                 : hasInvalidQuickLinkUrl
                   ? 'Every quick link URL must start with http://, https://, or / before you can save.'
-                  : 'The primary color must be a valid hex value before you can save.'}
+                  : hasEmptyQuickLinkLabel
+                    ? 'Every quick link needs a label before you can save.'
+                    : 'The primary color must be a valid hex value before you can save.'}
         </p>
       )}
 
@@ -449,7 +458,8 @@ export function SettingsPage() {
           {layout.map((key, index) => (
             <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
               {/* A plain div, not a <label>, so this row's visible text doesn't create a second
-                  label association for the checkbox alongside its explicit aria-label above. */}
+                  label association for the checkbox alongside its explicit aria-label above.
+                  The span's onClick restores the label-click affordance a <label> would give. */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1, fontSize: 14 }}>
                 <input
                   type="checkbox"
@@ -458,7 +468,12 @@ export function SettingsPage() {
                   onChange={(e) => toggleWidget(key, e.target.checked)}
                   style={{ width: 18, height: 18 }}
                 />
-                {WIDGET_LABELS[key]}
+                <span
+                  onClick={() => toggleWidget(key, false)}
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+                >
+                  {WIDGET_LABELS[key]}
+                </span>
               </div>
               <button
                 type="button"
@@ -490,7 +505,12 @@ export function SettingsPage() {
                   onChange={(e) => toggleWidget(key, e.target.checked)}
                   style={{ width: 18, height: 18 }}
                 />
-                {WIDGET_LABELS[key]}
+                <span
+                  onClick={() => toggleWidget(key, true)}
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+                >
+                  {WIDGET_LABELS[key]}
+                </span>
               </div>
             </div>
           ))}

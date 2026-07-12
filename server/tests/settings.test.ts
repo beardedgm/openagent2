@@ -145,6 +145,15 @@ describe('settings', () => {
     ]);
   });
 
+  it('accepts quickLinks urls with an uppercase scheme, matching the client-side check', async () => {
+    const broker = await loginAs(app, 'b13@x.com', 'broker');
+    const res = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ quickLinks: [{ label: 'Docs', url: 'HTTPS://docs.example.com' }] });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.quickLinks).toEqual([{ label: 'Docs', url: 'HTTPS://docs.example.com' }]);
+  });
+
   it('rejects quickLinks urls that are not http(s) or an internal path', async () => {
     const broker = await loginAs(app, 'b12@x.com', 'broker');
     const rejected = await broker

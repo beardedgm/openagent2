@@ -39,7 +39,7 @@ export const updateSettingsSchema = z.object({
         url: z
           .string()
           .max(500)
-          .refine((u) => /^https?:\/\//.test(u) || u.startsWith('/'), 'Must be an http(s) URL or an internal path starting with /'),
+          .refine((u) => /^https?:\/\//i.test(u) || u.startsWith('/'), 'Must be an http(s) URL or an internal path starting with /'),
       }),
     )
     .max(12)

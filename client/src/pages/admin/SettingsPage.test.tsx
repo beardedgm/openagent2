@@ -206,4 +206,15 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
     expect(screen.getByText('Every quick link URL must start with http://, https://, or / before you can save.')).toBeInTheDocument();
   });
+
+  it('blocks Save with a hint while a quick link label is empty', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    fireEvent.change(screen.getByLabelText('Quick link 1 URL'), { target: { value: '/directory' } });
+
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(screen.getByText('Every quick link needs a label before you can save.')).toBeInTheDocument();
+  });
 });
