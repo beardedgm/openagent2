@@ -1,4 +1,15 @@
 import { z } from 'zod';
+import { NOTIFICATION_TYPES } from '../models/Notification.js';
+
+export const HOMEPAGE_WIDGETS = [
+  'welcome',
+  'banners',
+  'announcements',
+  'myTasks',
+  'events',
+  'feed',
+  'quickLinks',
+] as const;
 
 export const updateSettingsSchema = z.object({
   brandName: z.string().min(1).max(100).optional(),
@@ -22,4 +33,10 @@ export const updateSettingsSchema = z.object({
   rssFeeds: z.array(z.string().url()).max(10).optional(),
   welcomeMessage: z.string().max(20000).optional(),
   quickLinks: z.array(z.object({ label: z.string().min(1).max(60), url: z.string().url() })).max(12).optional(),
+  homepageLayout: z
+    .array(z.enum(HOMEPAGE_WIDGETS))
+    .max(HOMEPAGE_WIDGETS.length)
+    .refine((a) => new Set(a).size === a.length, 'Duplicate widgets')
+    .optional(),
+  notificationDefaults: z.record(z.enum(NOTIFICATION_TYPES), z.boolean()).optional(),
 });

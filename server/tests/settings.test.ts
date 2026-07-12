@@ -96,4 +96,53 @@ describe('settings', () => {
     expect(cleared.status).toBe(200);
     expect(cleared.body.settings.onboardingTaskTemplateId).toBeNull();
   });
+
+  it('broker sets homepageLayout; persisted verbatim and readable via GET', async () => {
+    const broker = await loginAs(app, 'b5@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ homepageLayout: ['welcome', 'myTasks'] });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.homepageLayout).toEqual(['welcome', 'myTasks']);
+
+    const got = await broker.get('/api/v1/admin/settings');
+    expect(got.body.settings.homepageLayout).toEqual(['welcome', 'myTasks']);
+  });
+
+  it('rejects unknown homepageLayout widgets', async () => {
+    const broker = await loginAs(app, 'b6@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ homepageLayout: ['welcome', 'bogus'] });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects duplicate homepageLayout widgets', async () => {
+    const broker = await loginAs(app, 'b7@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ homepageLayout: ['welcome', 'welcome'] });
+    expect(res.status).toBe(400);
+  });
+
+  it('sanitizes welcomeMessage HTML the same way as post bodies', async () => {
+    const broker = await loginAs(app, 'b8@x.com', 'broker');
+    const res = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ welcomeMessage: '<p>Hi <script>alert(1)</script><a href="https://x.example.com">team</a></p>' });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.welcomeMessage).toBe(
+      '<p>Hi <a href="https://x.example.com" rel="noopener noreferrer" target="_blank">team</a></p>',
+    );
+  });
+
+  it('broker sets notificationDefaults; round-trips on GET', async () => {
+    const broker = await loginAs(app, 'b9@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ notificationDefaults: { postPublished: false } });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.notificationDefaults.postPublished).toBe(false);
+
+    const got = await broker.get('/api/v1/admin/settings');
+    expect(got.body.settings.notificationDefaults.postPublished).toBe(false);
+  });
+
+  it('rejects notificationDefaults with an unknown notification type', async () => {
+    const broker = await loginAs(app, 'b10@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ notificationDefaults: { notARealType: true } });
+    expect(res.status).toBe(400);
+  });
 });
