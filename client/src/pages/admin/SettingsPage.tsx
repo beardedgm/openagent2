@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { useMe, useSettings, useTaskTemplates } from '../../api/hooks';
 import type { Settings } from '../../api/types';
+import { RichTextEditor } from '../../components/RichTextEditor';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Field } from '../../components/ui/Field';
@@ -20,6 +22,48 @@ interface ResourceRow {
   name: string;
 }
 
+interface QuickLinkRow {
+  label: string;
+  url: string;
+}
+
+// Mirrors the server's HOMEPAGE_WIDGETS order (server/src/validators/settings.ts) — that file
+// is the source of truth for which keys are valid; this list only supplies display labels.
+const HOMEPAGE_WIDGET_KEYS = ['welcome', 'banners', 'announcements', 'myTasks', 'events', 'feed', 'quickLinks'] as const;
+
+const WIDGET_LABELS: Record<string, string> = {
+  welcome: 'Welcome message',
+  banners: 'Banner ads',
+  announcements: 'Pinned announcements',
+  myTasks: 'My tasks',
+  events: 'Upcoming events',
+  feed: 'Activity feed preview',
+  quickLinks: 'Quick links',
+};
+
+// Mirrors the server's NOTIFICATION_TYPES order (server/src/models/Notification.ts) — that file
+// is the source of truth for valid types; this list only supplies display labels. Deliberately
+// excludes eventReminders, a separate opt-in user preference never routed through notify().
+const NOTIFICATION_TYPE_KEYS = [
+  'invitationAccepted',
+  'postPublished',
+  'taskAssigned',
+  'taskDueSoon',
+  'taskOverdue',
+  'mandatoryEvent',
+  'bookmarkedResource',
+] as const;
+
+const NOTIFICATION_LABELS: Record<string, string> = {
+  invitationAccepted: 'An invitation I sent was accepted',
+  postPublished: 'Important announcements',
+  taskAssigned: 'New task assigned',
+  taskDueSoon: 'Task due soon',
+  taskOverdue: 'Task overdue',
+  mandatoryEvent: 'Mandatory calendar events',
+  bookmarkedResource: 'New resources in categories agents follow',
+};
+
 const TIMEZONES = [
   'America/New_York',
   'America/Chicago',
@@ -32,6 +76,7 @@ const TIMEZONES = [
 
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const MAX_RSS_FEEDS = 10;
+const MAX_QUICK_LINKS = 12;
 
 function errorMessage(err: unknown, fallback: string): string {
   if (isAxiosError(err)) return (err.response?.data as { error?: string })?.error ?? fallback;
@@ -58,6 +103,10 @@ export function SettingsPage() {
   const [rssFeeds, setRssFeeds] = useState<string[]>([]);
   const [resources, setResources] = useState<ResourceRow[]>([]);
   const [onboardingTaskTemplateId, setOnboardingTaskTemplateId] = useState('');
+  const [layout, setLayout] = useState<string[]>([]);
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [quickLinks, setQuickLinks] = useState<QuickLinkRow[]>([]);
+  const [notificationDefaults, setNotificationDefaults] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,6 +117,10 @@ export function SettingsPage() {
     setRssFeeds([...s.rssFeeds]);
     setResources(s.reservableResources.map((r) => ({ _id: r._id, name: r.name })));
     setOnboardingTaskTemplateId(s.onboardingTaskTemplateId ?? '');
+    setLayout([...s.homepageLayout]);
+    setWelcomeMessage(s.welcomeMessage);
+    setQuickLinks(s.quickLinks.map((l) => ({ label: l.label, url: l.url })));
+    setNotificationDefaults({ ...s.notificationDefaults });
   }
 
   useEffect(() => {
@@ -108,7 +161,19 @@ export function SettingsPage() {
   const hasEmptyOfficeName = offices.some((o) => !o.name.trim());
   const hasEmptyResourceName = resources.some((r) => !r.name.trim());
   const hasInvalidFeedUrl = rssFeeds.some((f) => !/^https?:\/\//i.test(f.trim()));
-  const canSave = hexIsValid && !hasEmptyOfficeName && !hasEmptyResourceName && !hasInvalidFeedUrl && !save.isPending;
+  const hasInvalidQuickLinkUrl = quickLinks.some((l) => {
+    const trimmed = l.url.trim();
+    return !(/^https?:\/\//i.test(trimmed) || trimmed.startsWith('/'));
+  });
+  const hasEmptyQuickLinkLabel = quickLinks.some((l) => !l.label.trim());
+  const canSave =
+    hexIsValid &&
+    !hasEmptyOfficeName &&
+    !hasEmptyResourceName &&
+    !hasInvalidFeedUrl &&
+    !hasInvalidQuickLinkUrl &&
+    !hasEmptyQuickLinkLabel &&
+    !save.isPending;
 
   function updateOffice(index: number, patch: Partial<OfficeRow>) {
     setOffices((prev) => prev.map((o, i) => (i === index ? { ...o, ...patch } : o)));
@@ -138,7 +203,41 @@ export function SettingsPage() {
     setResources((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function toggleWidget(key: string, enabled: boolean) {
+    setLayout((prev) => (enabled ? [...prev, key] : prev.filter((k) => k !== key)));
+  }
+
+  function moveWidget(key: string, direction: -1 | 1) {
+    setLayout((prev) => {
+      const index = prev.indexOf(key);
+      const swapIndex = index + direction;
+      if (index < 0 || swapIndex < 0 || swapIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+      return next;
+    });
+  }
+
+  function updateQuickLink(index: number, patch: Partial<QuickLinkRow>) {
+    setQuickLinks((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  }
+
+  function removeQuickLink(index: number) {
+    setQuickLinks((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function toggleNotificationDefault(key: string, enabled: boolean) {
+    setNotificationDefaults((prev) => ({ ...prev, [key]: enabled }));
+  }
+
   function handleSave() {
+    // The server replaces notificationDefaults wholesale on PATCH, so every type must be
+    // sent — a partial record would silently reset the omitted types to "unset" (=> on).
+    const notificationDefaultsBody = NOTIFICATION_TYPE_KEYS.reduce<Record<string, boolean>>((acc, key) => {
+      acc[key] = key === 'taskOverdue' ? true : notificationDefaults[key] ?? true;
+      return acc;
+    }, {});
+
     // canSave guarantees the hex is valid here, so primaryColor is always included.
     save.mutate({
       brandName,
@@ -147,6 +246,10 @@ export function SettingsPage() {
       rssFeeds: rssFeeds.map((f) => f.trim()),
       reservableResources: resources,
       onboardingTaskTemplateId: onboardingTaskTemplateId || null,
+      homepageLayout: layout,
+      welcomeMessage,
+      quickLinks,
+      notificationDefaults: notificationDefaultsBody,
     });
   }
 
@@ -182,7 +285,12 @@ export function SettingsPage() {
           Saved
         </p>
       )}
-      {(hasEmptyOfficeName || hasEmptyResourceName || hasInvalidFeedUrl || !hexIsValid) && (
+      {(hasEmptyOfficeName ||
+        hasEmptyResourceName ||
+        hasInvalidFeedUrl ||
+        hasInvalidQuickLinkUrl ||
+        hasEmptyQuickLinkLabel ||
+        !hexIsValid) && (
         <p style={{ color: 'var(--color-warning)', fontSize: 13 }}>
           {hasEmptyOfficeName
             ? 'Every office needs a name before you can save.'
@@ -190,7 +298,11 @@ export function SettingsPage() {
               ? 'Every resource needs a name before you can save.'
               : hasInvalidFeedUrl
                 ? 'Every feed URL must start with http:// or https:// before you can save.'
-                : 'The primary color must be a valid hex value before you can save.'}
+                : hasInvalidQuickLinkUrl
+                  ? 'Every quick link URL must start with http://, https://, or / before you can save.'
+                  : hasEmptyQuickLinkLabel
+                    ? 'Every quick link needs a label before you can save.'
+                    : 'The primary color must be a valid hex value before you can save.'}
         </p>
       )}
 
@@ -373,6 +485,165 @@ export function SettingsPage() {
               Maximum of {MAX_RSS_FEEDS} feeds.
             </span>
           )}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 style={{ fontSize: 18, marginBottom: 'var(--space-3)' }}>Homepage</h2>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+          {layout.map((key, index) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
+              {/* A plain div, not a <label>, so this row's visible text doesn't create a second
+                  label association for the checkbox alongside its explicit aria-label above.
+                  The span's onClick restores the label-click affordance a <label> would give. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1, fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  aria-label={`Show ${WIDGET_LABELS[key]} widget`}
+                  checked
+                  onChange={(e) => toggleWidget(key, e.target.checked)}
+                  style={{ width: 18, height: 18 }}
+                />
+                <span
+                  onClick={() => toggleWidget(key, false)}
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+                >
+                  {WIDGET_LABELS[key]}
+                </span>
+              </div>
+              <button
+                type="button"
+                aria-label={`Move ${WIDGET_LABELS[key]} up`}
+                disabled={index === 0}
+                onClick={() => moveWidget(key, -1)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', minWidth: 44, minHeight: 44, color: 'var(--color-text-muted)' }}
+              >
+                <ChevronUp size={16} />
+              </button>
+              <button
+                type="button"
+                aria-label={`Move ${WIDGET_LABELS[key]} down`}
+                disabled={index === layout.length - 1}
+                onClick={() => moveWidget(key, 1)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', minWidth: 44, minHeight: 44, color: 'var(--color-text-muted)' }}
+              >
+                <ChevronDown size={16} />
+              </button>
+            </div>
+          ))}
+          {HOMEPAGE_WIDGET_KEYS.filter((key) => !layout.includes(key)).map((key) => (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1, fontSize: 14, color: 'var(--color-text-muted)' }}>
+                <input
+                  type="checkbox"
+                  aria-label={`Show ${WIDGET_LABELS[key]} widget`}
+                  checked={false}
+                  onChange={(e) => toggleWidget(key, e.target.checked)}
+                  style={{ width: 18, height: 18 }}
+                />
+                <span
+                  onClick={() => toggleWidget(key, true)}
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
+                >
+                  {WIDGET_LABELS[key]}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gap: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>Welcome message</span>
+          <RichTextEditor value={welcomeMessage} onChange={setWelcomeMessage} />
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
+            Shown on everyone's homepage. Existing plain-text messages need a re-save to format.
+          </span>
+        </div>
+
+        <h3 style={{ fontSize: 15, marginBottom: 'var(--space-2)' }}>Quick links</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {quickLinks.map((link, index) => (
+            <div key={index} style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+              <input
+                aria-label={`Quick link ${index + 1} label`}
+                value={link.label}
+                onChange={(e) => updateQuickLink(index, { label: e.target.value })}
+                placeholder="Label"
+                style={{ ...rowInputStyle, flex: '1 1 160px' }}
+              />
+              <input
+                aria-label={`Quick link ${index + 1} URL`}
+                value={link.url}
+                onChange={(e) => updateQuickLink(index, { url: e.target.value })}
+                placeholder="https://… or /internal-path"
+                style={{ ...rowInputStyle, flex: '2 1 220px' }}
+              />
+              <Button variant="secondary" onClick={() => removeQuickLink(index)}>
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <Button
+            variant="secondary"
+            disabled={quickLinks.length >= MAX_QUICK_LINKS}
+            onClick={() => setQuickLinks((prev) => [...prev, { label: '', url: '' }])}
+          >
+            Add link
+          </Button>
+          {quickLinks.length >= MAX_QUICK_LINKS && (
+            <span style={{ color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 'var(--space-3)' }}>
+              Maximum of {MAX_QUICK_LINKS} quick links.
+            </span>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 style={{ fontSize: 18, marginBottom: 'var(--space-1)' }}>Email notification defaults</h2>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginBottom: 'var(--space-3)' }}>
+          Applies to agents who haven't set their own preference. Personal settings on a profile always win.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {NOTIFICATION_TYPE_KEYS.map((key) => {
+            const isTaskOverdue = key === 'taskOverdue';
+            const checked = isTaskOverdue ? true : notificationDefaults[key] ?? true;
+            return (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
+                {/* A plain div, not a <label>, so this row's visible text doesn't create a second
+                    label association for the checkbox alongside its explicit aria-label above.
+                    The span's onClick restores the label-click affordance a <label> would give. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Email agents about ${NOTIFICATION_LABELS[key]} by default`}
+                    checked={checked}
+                    disabled={isTaskOverdue}
+                    onChange={(e) => toggleNotificationDefault(key, e.target.checked)}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <span
+                    onClick={isTaskOverdue ? undefined : () => toggleNotificationDefault(key, !checked)}
+                    style={{
+                      cursor: isTaskOverdue ? 'default' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      minHeight: 44,
+                    }}
+                  >
+                    {NOTIFICATION_LABELS[key]}
+                  </span>
+                </div>
+                {isTaskOverdue && (
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
+                    Required — overdue task emails cannot be disabled.
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </Card>
     </div>

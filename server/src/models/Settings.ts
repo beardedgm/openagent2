@@ -28,6 +28,9 @@ const settingsSchema = new mongoose.Schema(
       default: ['welcome', 'banners', 'announcements', 'myTasks', 'events', 'feed', 'quickLinks'],
     },
     onboardingTaskTemplateId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    // Brokerage-wide email defaults per notification type (PRD 5.10.2). A user's own
+    // emailPrefs entry always wins; this map only fills the gap when the user never chose.
+    notificationDefaults: { type: Map, of: Boolean, default: {} },
   },
   { timestamps: true },
 );

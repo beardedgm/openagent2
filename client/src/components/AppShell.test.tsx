@@ -1,14 +1,36 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { lazy } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '../api/types';
+import { useUiStore } from '../store/uiStore';
 import { AppShell } from './AppShell';
 
-const { getMock } = vi.hoisted(() => ({ getMock: vi.fn() }));
+function stubNarrowViewport(matches: boolean) {
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+}
+
+const { getMock, postMock } = vi.hoisted(() => ({
+  getMock: vi.fn(),
+  postMock: vi.fn().mockResolvedValue({ data: undefined }),
+}));
 
 vi.mock('../api/client', () => ({
-  api: { get: getMock, post: vi.fn() },
+  api: { get: getMock, post: postMock },
 }));
 
 const brandSettings = { brandName: 'Acme Realty', logoUrl: '', primaryColor: '#1d4ed8' };
@@ -40,14 +62,15 @@ function mockAuthAs(user: User) {
   });
 }
 
-function wrap() {
+function wrap(initialEntries: string[] = ['/']) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route element={<AppShell />}>
             <Route path="/" element={<div>Page content</div>} />
+            <Route path="/tasks" element={<div>Tasks content</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -77,5 +100,84 @@ describe('AppShell', () => {
     expect(await screen.findByText('ADMIN')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /users/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it('keeps the shell chrome mounted while a lazy route chunk is loading', async () => {
+    mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+    // A lazy route whose chunk never resolves: the outlet stays suspended, so the shell's
+    // own Suspense fallback (Spinner) should render in the content area while the sidebar
+    // and header remain mounted.
+    const NeverResolves = lazy(() => new Promise<{ default: () => JSX.Element }>(() => {}));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/slow']}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/slow" element={<NeverResolves />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Acme Realty')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /main navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
+  });
+
+  it('posts a page-view beacon once for the initial route and does not double-post on rerender', async () => {
+    mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+    postMock.mockClear();
+
+    const element = wrap(['/tasks']);
+    const { rerender } = render(element);
+
+    await screen.findByText('Tasks content');
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(postMock).toHaveBeenCalledWith('/engagement/page-view', { path: '/tasks' });
+
+    rerender(element);
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe('narrow-viewport sidebar overlay', () => {
+    afterEach(() => {
+      useUiStore.setState({ sidebarOpen: window.innerWidth > 880 });
+    });
+
+    it('renders a scrim behind the open sidebar and closes on scrim click', async () => {
+      const restoreMatchMedia = stubNarrowViewport(true);
+      mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+      useUiStore.setState({ sidebarOpen: true });
+
+      render(wrap());
+      await screen.findByText('Acme Realty');
+
+      const scrim = document.querySelector('[data-testid="sidebar-scrim"]');
+      expect(scrim).toBeInTheDocument();
+      expect(scrim).toHaveAttribute('aria-hidden', 'true');
+
+      fireEvent.click(scrim!);
+      expect(useUiStore.getState().sidebarOpen).toBe(false);
+
+      restoreMatchMedia();
+    });
+
+    it('closes the sidebar on Escape', async () => {
+      const restoreMatchMedia = stubNarrowViewport(true);
+      mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+      useUiStore.setState({ sidebarOpen: true });
+
+      render(wrap());
+      await screen.findByText('Acme Realty');
+
+      fireEvent.keyDown(screen.getByRole('navigation', { name: /main navigation/i }), { key: 'Escape' });
+      expect(useUiStore.getState().sidebarOpen).toBe(false);
+
+      restoreMatchMedia();
+    });
   });
 });

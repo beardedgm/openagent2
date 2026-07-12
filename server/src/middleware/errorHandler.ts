@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import multer from 'multer';
 import { ZodError } from 'zod';
+import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 
 export class AppError extends Error {
@@ -46,5 +47,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
   logger.error(err);
+  if (env.SENTRY_DSN) {
+    // Fire-and-forget: error reporting must never affect the response path.
+    import('@sentry/node').then((S) => S.captureException(err)).catch(() => {});
+  }
   res.status(500).json({ error: 'Internal server error' });
 }

@@ -33,6 +33,7 @@ export interface Settings {
   homepageLayout: string[];
   reservableResources: ReservableResource[];
   onboardingTaskTemplateId: string | null;
+  notificationDefaults: Record<string, boolean>;
 }
 
 export interface PublicSettings {

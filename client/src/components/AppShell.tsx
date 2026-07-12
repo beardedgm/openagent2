@@ -1,11 +1,30 @@
-import { Bell, CalendarDays, ClipboardList, FolderOpen, FolderTree, Image, LayoutDashboard, LayoutTemplate, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
+import {
+  Bell,
+  CalendarDays,
+  ClipboardList,
+  FolderOpen,
+  FolderTree,
+  Image,
+  LayoutDashboard,
+  LayoutTemplate,
+  LogOut,
+  Megaphone,
+  Menu,
+  Newspaper,
+  Settings,
+  UserSquare,
+  Users,
+} from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
 import { useLogout, useMe, useNotifications, usePublicSettings } from '../api/hooks';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUiStore } from '../store/uiStore';
 import { applyAccentColor } from '../utils/applyAccentColor';
 import { NotificationsDrawer } from './NotificationsDrawer';
+import { Spinner } from './ui/Spinner';
 
 // Below this viewport width, the 240px sidebar no longer fits comfortably alongside content
 // (see DESIGN.md §7). The sidebar becomes an off-canvas overlay, toggled by the same
@@ -33,9 +52,28 @@ function navLinkStyle(isActive: boolean): CSSProperties {
     borderRadius: 'var(--radius-sm)',
     textDecoration: 'none',
     color: isActive ? 'var(--color-accent)' : 'var(--color-text)',
-    background: isActive ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent',
+    background: isActive
+      ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)'
+      : 'transparent',
     fontWeight: isActive ? 700 : 500,
   };
+}
+
+// Tracks whether the viewport is at or below the sidebar-collapse breakpoint, updating
+// live as the viewport is resized (e.g. rotating a tablet or resizing a desktop window).
+function useNarrowViewport(breakpoint: number) {
+  const query = `(max-width: ${breakpoint}px)`;
+  const [narrow, setNarrow] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia ? false : window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia(query);
+    const onChange = () => setNarrow(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [query]);
+  return narrow;
 }
 
 export function AppShell() {
@@ -48,10 +86,22 @@ export function AppShell() {
   const [notifOpen, setNotifOpen] = useState(false);
   const { data: notifData } = useNotifications();
   const unread = notifData?.unreadCount ?? 0;
+  const narrow = useNarrowViewport(SIDEBAR_COLLAPSE_BREAKPOINT);
+  const sidebarRef = useRef<HTMLElement>(null);
+  useFocusTrap(sidebarRef, sidebarOpen && narrow, toggleSidebar);
 
   useEffect(() => {
     if (branding?.primaryColor) applyAccentColor(branding.primaryColor);
   }, [branding?.primaryColor]);
+
+  const location = useLocation();
+  const lastPath = useRef<string>();
+  useEffect(() => {
+    if (lastPath.current === location.pathname) return;
+    lastPath.current = location.pathname;
+    // Fire-and-forget engagement beacon (PRD 6.3 note): errors are irrelevant to UX.
+    void api.post('/engagement/page-view', { path: location.pathname }).catch(() => {});
+  }, [location.pathname]);
 
   const isAdmin = me?.role === 'officeAdmin' || me?.role === 'broker';
   const isBroker = me?.role === 'broker';
@@ -60,6 +110,7 @@ export function AppShell() {
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       {sidebarOpen && (
         <nav
+          ref={sidebarRef}
           aria-label="Main navigation"
           className="app-shell-sidebar"
           style={{
@@ -143,6 +194,19 @@ export function AppShell() {
             </>
           )}
         </nav>
+      )}
+      {sidebarOpen && narrow && (
+        <div
+          data-testid="sidebar-scrim"
+          aria-hidden="true"
+          onClick={toggleSidebar}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 19,
+            background: 'rgba(0, 0, 0, 0.4)',
+          }}
+        />
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header
@@ -259,7 +323,11 @@ export function AppShell() {
             padding: 'var(--space-5)',
           }}
         >
-          <Outlet />
+          {/* Suspense lives here (not above the shell) so sidebar/header stay mounted while a
+              lazy route chunk loads — only the content area shows the spinner. */}
+          <Suspense fallback={<Spinner />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
       <style>{`

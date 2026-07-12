@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { validate } from '../middleware/validate.js';
 import { getSettings } from '../models/Settings.js';
 import { TaskTemplate } from '../models/TaskTemplate.js';
+import { sanitizePostHtml } from '../utils/sanitizeHtml.js';
 import { updateSettingsSchema } from '../validators/settings.js';
 
 export const settingsRouter = Router();
@@ -43,6 +44,10 @@ adminSettingsRouter.patch(
       if (!(await TaskTemplate.findById(req.body.onboardingTaskTemplateId))) {
         throw new AppError(400, 'Unknown task template');
       }
+    }
+    if (typeof req.body.welcomeMessage === 'string') {
+      // Welcome message renders as rich HTML on the dashboard — same trust boundary as post bodies.
+      req.body.welcomeMessage = sanitizePostHtml(req.body.welcomeMessage);
     }
     const s = await getSettings();
     Object.assign(s, req.body);

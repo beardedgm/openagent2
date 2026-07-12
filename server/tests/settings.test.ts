@@ -96,4 +96,85 @@ describe('settings', () => {
     expect(cleared.status).toBe(200);
     expect(cleared.body.settings.onboardingTaskTemplateId).toBeNull();
   });
+
+  it('broker sets homepageLayout; persisted verbatim and readable via GET', async () => {
+    const broker = await loginAs(app, 'b5@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ homepageLayout: ['welcome', 'myTasks'] });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.homepageLayout).toEqual(['welcome', 'myTasks']);
+
+    const got = await broker.get('/api/v1/admin/settings');
+    expect(got.body.settings.homepageLayout).toEqual(['welcome', 'myTasks']);
+  });
+
+  it('rejects unknown homepageLayout widgets', async () => {
+    const broker = await loginAs(app, 'b6@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ homepageLayout: ['welcome', 'bogus'] });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects duplicate homepageLayout widgets', async () => {
+    const broker = await loginAs(app, 'b7@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ homepageLayout: ['welcome', 'welcome'] });
+    expect(res.status).toBe(400);
+  });
+
+  it('sanitizes welcomeMessage HTML the same way as post bodies', async () => {
+    const broker = await loginAs(app, 'b8@x.com', 'broker');
+    const res = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ welcomeMessage: '<p>Hi <script>alert(1)</script><a href="https://x.example.com">team</a></p>' });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.welcomeMessage).toBe(
+      '<p>Hi <a href="https://x.example.com" rel="noopener noreferrer" target="_blank">team</a></p>',
+    );
+  });
+
+  it('accepts internal-path and http(s) quickLinks urls; round-trips verbatim', async () => {
+    const broker = await loginAs(app, 'b11@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({
+      quickLinks: [
+        { label: 'Directory', url: '/directory' },
+        { label: 'Docs', url: 'https://docs.example.com' },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.quickLinks).toEqual([
+      { label: 'Directory', url: '/directory' },
+      { label: 'Docs', url: 'https://docs.example.com' },
+    ]);
+  });
+
+  it('accepts quickLinks urls with an uppercase scheme, matching the client-side check', async () => {
+    const broker = await loginAs(app, 'b13@x.com', 'broker');
+    const res = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ quickLinks: [{ label: 'Docs', url: 'HTTPS://docs.example.com' }] });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.quickLinks).toEqual([{ label: 'Docs', url: 'HTTPS://docs.example.com' }]);
+  });
+
+  it('rejects quickLinks urls that are not http(s) or an internal path', async () => {
+    const broker = await loginAs(app, 'b12@x.com', 'broker');
+    const rejected = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ quickLinks: [{ label: 'Bad', url: 'javascript:alert(1)' }] });
+    expect(rejected.status).toBe(400);
+  });
+
+  it('broker sets notificationDefaults; round-trips on GET', async () => {
+    const broker = await loginAs(app, 'b9@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ notificationDefaults: { postPublished: false } });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.notificationDefaults.postPublished).toBe(false);
+
+    const got = await broker.get('/api/v1/admin/settings');
+    expect(got.body.settings.notificationDefaults.postPublished).toBe(false);
+  });
+
+  it('rejects notificationDefaults with an unknown notification type', async () => {
+    const broker = await loginAs(app, 'b10@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({ notificationDefaults: { notARealType: true } });
+    expect(res.status).toBe(400);
+  });
 });

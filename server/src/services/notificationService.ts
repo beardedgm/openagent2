@@ -1,5 +1,6 @@
 import { logger } from '../config/logger.js';
 import { Notification, type NotificationType } from '../models/Notification.js';
+import { getSettings } from '../models/Settings.js';
 import { User } from '../models/User.js';
 import { sendEmail } from './emailService.js';
 
@@ -20,9 +21,13 @@ export async function notify(
     userIds.map((userId) => ({ userId, type: input.type, title: input.title, link: input.link ?? '' })),
   );
   if (!email) return;
+  const settings = await getSettings();
   const users = await User.find({ _id: { $in: userIds }, status: 'active' });
   for (const u of users) {
-    const wantsEmail = (u.emailPrefs as Map<string, boolean>).get(input.type) ?? true;
+    const wantsEmail =
+      (u.emailPrefs as Map<string, boolean>).get(input.type) ??
+      (settings.notificationDefaults as Map<string, boolean>).get(input.type) ??
+      true;
     if (!email.nonDisableable && !wantsEmail) continue;
     try {
       await sendEmail(u.email, email.subject, email.html);

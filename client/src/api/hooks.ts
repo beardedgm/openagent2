@@ -1,10 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { api } from './client';
 import type {
   BannerInfo,
   CalendarEventInfo,
   Category,
   EventOccurrence,
+  FeedResponse,
   Invitation,
   NotificationsResponse,
   OnboardingProgress,
@@ -102,6 +104,17 @@ export function useComments(postId: string | undefined) {
   });
 }
 
+export function useFeedPreview() {
+  return useQuery({
+    queryKey: ['feed', 'preview'],
+    queryFn: async () => {
+      const { data } = await api.get<FeedResponse>('/feed');
+      return [...data.pinned, ...data.items].slice(0, 5);
+    },
+    staleTime: 60_000,
+  });
+}
+
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
@@ -132,6 +145,15 @@ export function useEvent(id: string | undefined) {
       (await api.get<{ event: CalendarEventInfo; rsvpSummary?: RsvpSummary }>(`/events/${id}`)).data,
     enabled: !!id,
   });
+}
+
+// Fixed 30-day/5-item preview for the dashboard events widget; useMemo keeps the from/to
+// (and thus the useEvents query key) stable across re-renders instead of drifting every render.
+export function useUpcomingEvents(days = 30, limit = 5) {
+  const from = useMemo(() => new Date(), []);
+  const to = useMemo(() => new Date(from.getTime() + days * 86_400_000), [from, days]);
+  const q = useEvents(from.toISOString(), to.toISOString());
+  return { ...q, data: q.data ? q.data.slice(0, limit) : undefined };
 }
 
 export function useTasks(scope: 'mine' | 'all') {
@@ -231,10 +253,6 @@ export function useResourceMutations() {
     update: useMutation({
       mutationFn: async ({ id, ...patch }: { id: string } & Record<string, unknown>) =>
         (await api.patch<{ resource: ResourceInfo }>(`/resources/${id}`, patch)).data.resource,
-      onSuccess: invalidate,
-    }),
-    remove: useMutation({
-      mutationFn: async (id: string) => (await api.delete(`/resources/${id}`)).data,
       onSuccess: invalidate,
     }),
     uploadFile: useMutation({

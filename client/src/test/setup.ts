@@ -23,3 +23,20 @@ if (!HTMLDialogElement.prototype.close) {
     setTimeout(() => this.dispatchEvent(new Event('close')), 0);
   };
 }
+
+// jsdom does not implement window.matchMedia at all, so any component that checks a
+// breakpoint via matchMedia (e.g. AppShell's narrow-mode detection) throws
+// "matchMedia is not a function" without this stub. Defaults to a non-matching,
+// static MediaQueryList; tests that need a specific viewport override it directly.
+if (!window.matchMedia) {
+  window.matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }) as unknown as MediaQueryList;
+}

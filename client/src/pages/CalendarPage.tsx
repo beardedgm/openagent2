@@ -1,12 +1,12 @@
 import { AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useEvents } from '../api/hooks';
 import type { EventOccurrence } from '../api/types';
 import { Card } from '../components/ui/Card';
 import { Spinner } from '../components/ui/Spinner';
 import { Button } from '../components/ui/Button';
-import { addDays, monthGrid, sameLocalDay, startOfWeek } from '../utils/calendarGrid';
+import { addDays, monthGrid, sameLocalDay, startOfWeek, type DayCell } from '../utils/calendarGrid';
 
 type View = 'month' | 'week' | 'day';
 const VIEWS: View[] = ['month', 'week', 'day'];
@@ -38,12 +38,70 @@ function occursOnDay(o: EventOccurrence, day: Date): boolean {
   return new Date(o.startAt) < dayEnd && new Date(o.endAt) > dayStart;
 }
 
+function formatDateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function eventCountLabel(n: number): string {
+  if (n === 0) return 'no events';
+  if (n === 1) return '1 event';
+  return `${n} events`;
+}
+
+// Roving-tabindex default: today when it appears in the displayed grid, else the 1st of
+// the displayed month (which is always present in monthGrid's 42 cells).
+function defaultFocusDay(cells: DayCell[], anchor: Date): Date {
+  const today = new Date();
+  const todayCell = cells.find((c) => sameLocalDay(c.date, today));
+  return todayCell ? todayCell.date : new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+}
+
 export function CalendarPage() {
   const [view, setView] = useState<View>('month'); // PRD 5.4: default Month
   const [anchor, setAnchor] = useState(() => new Date());
   const navigate = useNavigate();
   const { from, to } = rangeFor(view, anchor);
   const { data: occurrences, isLoading } = useEvents(from.toISOString(), to.toISOString());
+
+  // Month-grid keyboard navigation (roving tabindex).
+  const [focusedDay, setFocusedDay] = useState<Date | null>(null);
+  const monthGridRef = useRef<HTMLDivElement>(null);
+  const monthCells = monthGrid(anchor.getFullYear(), anchor.getMonth());
+  const monthWeeks: DayCell[][] = [];
+  for (let i = 0; i < monthCells.length; i += 7) monthWeeks.push(monthCells.slice(i, i + 7));
+  const tabbableDay =
+    focusedDay && monthCells.some((c) => sameLocalDay(c.date, focusedDay))
+      ? focusedDay
+      : defaultFocusDay(monthCells, anchor);
+
+  useEffect(() => {
+    if (!focusedDay) return;
+    const el = monthGridRef.current?.querySelector<HTMLElement>(`[data-date="${formatDateKey(focusedDay)}"]`);
+    el?.focus();
+  }, [focusedDay]);
+
+  function activateDayCell(date: Date) {
+    const el = monthGridRef.current?.querySelector<HTMLElement>(`[data-date="${formatDateKey(date)}"]`);
+    el?.querySelector('button')?.click();
+  }
+
+  function handleMonthGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    // Only handle keys originating from a day cell — chips/'+N more' buttons handle their own Enter/Space.
+    if (!(e.target instanceof HTMLElement) || !e.target.hasAttribute('data-date')) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      activateDayCell(tabbableDay);
+      return;
+    }
+    const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' ? 7 : e.key === 'ArrowUp' ? -7 : null;
+    if (delta === null) return;
+    // Consume handled arrow keys even when the move is clamped, so edge presses don't scroll the page.
+    e.preventDefault();
+    const next = addDays(tabbableDay, delta);
+    // Clamp to the 42 rendered day cells of the currently displayed grid (including muted
+    // lead/trail days from adjacent months) rather than hopping to a new month view.
+    if (monthCells.some((c) => sameLocalDay(c.date, next))) setFocusedDay(next);
+  }
 
   const title =
     view === 'month'
@@ -130,36 +188,53 @@ export function CalendarPage() {
 
       {view === 'month' && (
         <Card style={{ padding: 'var(--space-2)', overflowX: 'auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(90px, 1fr))', gap: 2 }}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', padding: 4 }}>{d}</div>
-            ))}
-            {monthGrid(anchor.getFullYear(), anchor.getMonth()).map((cell) => {
-              const todays = (occurrences ?? []).filter((o) => occursOnDay(o, cell.date));
-              return (
-                <div
-                  key={cell.date.toISOString()}
-                  style={{
-                    minHeight: 88, padding: 2, borderRadius: 'var(--radius-sm)',
-                    background: cell.inMonth ? 'transparent' : 'color-mix(in srgb, var(--color-border) 30%, transparent)',
-                    outline: sameLocalDay(cell.date, new Date()) ? '2px solid var(--color-accent)' : 'none',
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: cell.inMonth ? 'var(--color-text)' : 'var(--color-text-muted)', padding: 2 }}>
-                    {cell.date.getDate()}
-                  </div>
-                  {todays.slice(0, 3).map(occLabel)}
-                  {todays.length > 3 && (
-                    <button
-                      onClick={() => { setAnchor(cell.date); setView('day'); }}
-                      style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'transparent', border: 'none', padding: '1px 4px' }}
+          <div
+            ref={monthGridRef}
+            role="grid"
+            aria-label={`${title} calendar`}
+            onKeyDown={handleMonthGridKeyDown}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(90px, 1fr))', gap: 2 }}
+          >
+            <div role="row" style={{ display: 'contents' }}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                <div key={d} role="columnheader" style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', padding: 4 }}>{d}</div>
+              ))}
+            </div>
+            {monthWeeks.map((week, wi) => (
+              <div role="row" key={`week-${wi}`} style={{ display: 'contents' }}>
+                {week.map((cell) => {
+                  const todays = (occurrences ?? []).filter((o) => occursOnDay(o, cell.date));
+                  const dateKey = formatDateKey(cell.date);
+                  return (
+                    <div
+                      key={dateKey}
+                      role="gridcell"
+                      data-date={dateKey}
+                      tabIndex={sameLocalDay(cell.date, tabbableDay) ? 0 : -1}
+                      aria-label={`${cell.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}, ${eventCountLabel(todays.length)}`}
+                      style={{
+                        minHeight: 88, padding: 2, borderRadius: 'var(--radius-sm)',
+                        background: cell.inMonth ? 'transparent' : 'color-mix(in srgb, var(--color-border) 30%, transparent)',
+                        outline: sameLocalDay(cell.date, new Date()) ? '2px solid var(--color-accent)' : 'none',
+                      }}
                     >
-                      +{todays.length - 3} more
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                      <div style={{ fontSize: 12, color: cell.inMonth ? 'var(--color-text)' : 'var(--color-text-muted)', padding: 2 }}>
+                        {cell.date.getDate()}
+                      </div>
+                      {todays.slice(0, 3).map(occLabel)}
+                      {todays.length > 3 && (
+                        <button
+                          onClick={() => { setAnchor(cell.date); setView('day'); }}
+                          style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'transparent', border: 'none', padding: '1px 4px' }}
+                        >
+                          +{todays.length - 3} more
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </Card>
       )}
