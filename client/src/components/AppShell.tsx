@@ -1,7 +1,8 @@
 import { Bell, CalendarDays, ClipboardList, FolderOpen, FolderTree, Image, LayoutDashboard, LayoutTemplate, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
 import { useLogout, useMe, useNotifications, usePublicSettings } from '../api/hooks';
 import { useUiStore } from '../store/uiStore';
 import { applyAccentColor } from '../utils/applyAccentColor';
@@ -52,6 +53,15 @@ export function AppShell() {
   useEffect(() => {
     if (branding?.primaryColor) applyAccentColor(branding.primaryColor);
   }, [branding?.primaryColor]);
+
+  const location = useLocation();
+  const lastPath = useRef<string>();
+  useEffect(() => {
+    if (lastPath.current === location.pathname) return;
+    lastPath.current = location.pathname;
+    // Fire-and-forget engagement beacon (PRD 6.3 note): errors are irrelevant to UX.
+    void api.post('/engagement/page-view', { path: location.pathname }).catch(() => {});
+  }, [location.pathname]);
 
   const isAdmin = me?.role === 'officeAdmin' || me?.role === 'broker';
   const isBroker = me?.role === 'broker';

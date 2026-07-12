@@ -5,10 +5,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { User } from '../api/types';
 import { AppShell } from './AppShell';
 
-const { getMock } = vi.hoisted(() => ({ getMock: vi.fn() }));
+const { getMock, postMock } = vi.hoisted(() => ({
+  getMock: vi.fn(),
+  postMock: vi.fn().mockResolvedValue({ data: undefined }),
+}));
 
 vi.mock('../api/client', () => ({
-  api: { get: getMock, post: vi.fn() },
+  api: { get: getMock, post: postMock },
 }));
 
 const brandSettings = { brandName: 'Acme Realty', logoUrl: '', primaryColor: '#1d4ed8' };
@@ -40,14 +43,15 @@ function mockAuthAs(user: User) {
   });
 }
 
-function wrap() {
+function wrap(initialEntries: string[] = ['/']) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route element={<AppShell />}>
             <Route path="/" element={<div>Page content</div>} />
+            <Route path="/tasks" element={<div>Tasks content</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -77,5 +81,21 @@ describe('AppShell', () => {
     expect(await screen.findByText('ADMIN')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /users/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it('posts a page-view beacon once for the initial route and does not double-post on rerender', async () => {
+    mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+    postMock.mockClear();
+
+    const element = wrap(['/tasks']);
+    const { rerender } = render(element);
+
+    await screen.findByText('Tasks content');
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(postMock).toHaveBeenCalledWith('/engagement/page-view', { path: '/tasks' });
+
+    rerender(element);
+
+    expect(postMock).toHaveBeenCalledTimes(1);
   });
 });
