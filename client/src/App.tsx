@@ -13,6 +13,8 @@ import { PostEditorPage } from './pages/PostEditorPage';
 import { PostPage } from './pages/PostPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ResourceDetailPage } from './pages/ResourceDetailPage';
+import { ResourceEditorPage } from './pages/ResourceEditorPage';
 import { ResourceHubPage } from './pages/ResourceHubPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
 import { TaskEditorPage } from './pages/TaskEditorPage';
@@ -61,6 +63,23 @@ export function App() {
         <Route path="/calendar/:id/edit" element={<EventEditorPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/resources" element={<ResourceHubPage />} />
+        <Route
+          path="/resources/new"
+          element={
+            <RequireAuth min="officeAdmin">
+              <ResourceEditorPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="/resources/:id" element={<ResourceDetailPage />} />
+        <Route
+          path="/resources/:id/edit"
+          element={
+            <RequireAuth min="officeAdmin">
+              <ResourceEditorPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/tasks/new"
           element={
