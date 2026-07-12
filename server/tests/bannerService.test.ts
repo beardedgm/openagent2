@@ -45,6 +45,25 @@ describe('bannerService', () => {
     ).rejects.toThrow(/image/i);
   });
 
+  it('strips links from banner bodies — the CTA is the banner\'s only action', async () => {
+    const broker = await makeUser('b6@x.com');
+    const banner = await createBanner(
+      {
+        kind: 'text',
+        title: 'Linky',
+        bodyHtml: '<p>Hi <a href="https://evil.example.com">click</a></p>',
+        startAt: new Date(Date.now() - DAY),
+        endAt: new Date(Date.now() + DAY),
+      },
+      broker,
+    );
+    expect(banner.bodyHtml).toBe('<p>Hi click</p>');
+    const updated = await updateBanner(banner.id, {
+      bodyHtml: '<p>Also <a href="https://evil.example.com">here</a> <strong>bold</strong></p>',
+    });
+    expect(updated.bodyHtml).toBe('<p>Also here <strong>bold</strong></p>');
+  });
+
   it('activeBannersFor: schedule window + office targeting', async () => {
     const officeA = '64b000000000000000000001';
     const broker = await makeUser('b2@x.com');

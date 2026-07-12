@@ -1,7 +1,7 @@
 import { AppError } from '../middleware/errorHandler.js';
 import { Banner, type BannerDoc } from '../models/Banner.js';
 import type { UserDoc } from '../models/User.js';
-import { sanitizePostHtml } from '../utils/sanitizeHtml.js';
+import { sanitizeBannerHtml } from '../utils/sanitizeHtml.js';
 
 export interface BannerInput {
   kind: 'image' | 'text';
@@ -21,7 +21,7 @@ function assertScheduleOrder(startAt: Date, endAt: Date): void {
 
 export async function createBanner(input: BannerInput, creator: UserDoc): Promise<BannerDoc> {
   assertScheduleOrder(input.startAt, input.endAt);
-  const bodyHtml = sanitizePostHtml(input.bodyHtml ?? '');
+  const bodyHtml = sanitizeBannerHtml(input.bodyHtml ?? '');
   if (input.kind === 'text' && !bodyHtml) throw new AppError(400, 'Text banners need content');
   if (input.kind === 'image' && !input.imageUrl) throw new AppError(400, 'Image banners need an image');
   return Banner.create({ ...input, bodyHtml, createdBy: creator.id });
@@ -32,7 +32,7 @@ export async function updateBanner(id: string, patch: Partial<BannerInput>): Pro
   if (!banner) throw new AppError(404, 'Banner not found');
   if (patch.title !== undefined) banner.title = patch.title;
   if (patch.imageUrl !== undefined) banner.imageUrl = patch.imageUrl;
-  if (patch.bodyHtml !== undefined) banner.bodyHtml = sanitizePostHtml(patch.bodyHtml);
+  if (patch.bodyHtml !== undefined) banner.bodyHtml = sanitizeBannerHtml(patch.bodyHtml);
   if (patch.ctaLabel !== undefined) banner.ctaLabel = patch.ctaLabel;
   if (patch.ctaUrl !== undefined) banner.ctaUrl = patch.ctaUrl;
   if (patch.officeId !== undefined) banner.officeId = (patch.officeId ?? null) as never;

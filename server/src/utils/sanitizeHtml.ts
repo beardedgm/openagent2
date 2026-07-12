@@ -16,6 +16,20 @@ export function sanitizePostHtml(html: string): string {
   return sanitize(html, OPTIONS);
 }
 
+// Banner bodies render inside the homepage slot's clickable card (BannerSlot), where the CTA is
+// the banner's only link — an in-body <a> would nest interactive content and double-navigate.
+// Identical to OPTIONS above minus anchors; a stripped anchor keeps its text.
+const BANNER_OPTIONS: sanitize.IOptions = {
+  allowedTags: ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li', 'h2', 'h3', 'blockquote', 'img'],
+  allowedAttributes: { img: ['src', 'alt'] },
+  allowedSchemes: ['http', 'https', 'mailto'],
+  allowProtocolRelative: false,
+};
+
+export function sanitizeBannerHtml(html: string): string {
+  return sanitize(html, BANNER_OPTIONS);
+}
+
 export function htmlToText(html: string): string {
   // Insert a space at bare tag boundaries so adjacent block elements (e.g. </h2><p>)
   // don't have their text run together once tags are stripped below.
