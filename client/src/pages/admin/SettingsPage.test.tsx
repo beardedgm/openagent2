@@ -45,6 +45,7 @@ const serverSettings = {
   homepageLayout: ['welcome', 'banners', 'announcements', 'myTasks', 'events', 'feed', 'quickLinks'],
   reservableResources: [{ _id: 'r1', name: 'Conference Room A' }],
   onboardingTaskTemplateId: null,
+  notificationDefaults: {},
 };
 
 interface OfficeBody {
@@ -216,5 +217,45 @@ describe('SettingsPage', () => {
 
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
     expect(screen.getByText('Every quick link needs a label before you can save.')).toBeInTheDocument();
+  });
+
+  it('lists the seven notification types seeded on, with taskOverdue locked always-on', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    for (const label of [
+      'An invitation I sent was accepted',
+      'Important announcements',
+      'New task assigned',
+      'Task due soon',
+      'Task overdue',
+      'Mandatory calendar events',
+      'New resources in categories agents follow',
+    ]) {
+      expect(screen.getByLabelText(`Email agents about ${label} by default`)).toBeChecked();
+    }
+
+    expect(screen.getByLabelText('Email agents about Task overdue by default')).toBeDisabled();
+    expect(screen.getByText('Required — overdue task emails cannot be disabled.')).toBeInTheDocument();
+  });
+
+  it('saves the complete notificationDefaults record after toggling one type off', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    fireEvent.click(screen.getByLabelText('Email agents about Important announcements by default'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await screen.findByText('Saved');
+    const body = patchMock.mock.calls[0][1];
+    expect(body.notificationDefaults).toEqual({
+      invitationAccepted: true,
+      postPublished: false,
+      taskAssigned: true,
+      taskDueSoon: true,
+      taskOverdue: true,
+      mandatoryEvent: true,
+      bookmarkedResource: true,
+    });
   });
 });

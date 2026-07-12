@@ -41,6 +41,29 @@ const WIDGET_LABELS: Record<string, string> = {
   quickLinks: 'Quick links',
 };
 
+// Mirrors the server's NOTIFICATION_TYPES order (server/src/models/Notification.ts) — that file
+// is the source of truth for valid types; this list only supplies display labels. Deliberately
+// excludes eventReminders, a separate opt-in user preference never routed through notify().
+const NOTIFICATION_TYPE_KEYS = [
+  'invitationAccepted',
+  'postPublished',
+  'taskAssigned',
+  'taskDueSoon',
+  'taskOverdue',
+  'mandatoryEvent',
+  'bookmarkedResource',
+] as const;
+
+const NOTIFICATION_LABELS: Record<string, string> = {
+  invitationAccepted: 'An invitation I sent was accepted',
+  postPublished: 'Important announcements',
+  taskAssigned: 'New task assigned',
+  taskDueSoon: 'Task due soon',
+  taskOverdue: 'Task overdue',
+  mandatoryEvent: 'Mandatory calendar events',
+  bookmarkedResource: 'New resources in categories agents follow',
+};
+
 const TIMEZONES = [
   'America/New_York',
   'America/Chicago',
@@ -83,6 +106,7 @@ export function SettingsPage() {
   const [layout, setLayout] = useState<string[]>([]);
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [quickLinks, setQuickLinks] = useState<QuickLinkRow[]>([]);
+  const [notificationDefaults, setNotificationDefaults] = useState<Record<string, boolean>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,6 +120,7 @@ export function SettingsPage() {
     setLayout([...s.homepageLayout]);
     setWelcomeMessage(s.welcomeMessage);
     setQuickLinks(s.quickLinks.map((l) => ({ label: l.label, url: l.url })));
+    setNotificationDefaults({ ...s.notificationDefaults });
   }
 
   useEffect(() => {
@@ -201,7 +226,18 @@ export function SettingsPage() {
     setQuickLinks((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function toggleNotificationDefault(key: string, enabled: boolean) {
+    setNotificationDefaults((prev) => ({ ...prev, [key]: enabled }));
+  }
+
   function handleSave() {
+    // The server replaces notificationDefaults wholesale on PATCH, so every type must be
+    // sent — a partial record would silently reset the omitted types to "unset" (=> on).
+    const notificationDefaultsBody = NOTIFICATION_TYPE_KEYS.reduce<Record<string, boolean>>((acc, key) => {
+      acc[key] = key === 'taskOverdue' ? true : notificationDefaults[key] ?? true;
+      return acc;
+    }, {});
+
     // canSave guarantees the hex is valid here, so primaryColor is always included.
     save.mutate({
       brandName,
@@ -213,6 +249,7 @@ export function SettingsPage() {
       homepageLayout: layout,
       welcomeMessage,
       quickLinks,
+      notificationDefaults: notificationDefaultsBody,
     });
   }
 
@@ -561,6 +598,52 @@ export function SettingsPage() {
               Maximum of {MAX_QUICK_LINKS} quick links.
             </span>
           )}
+        </div>
+      </Card>
+
+      <Card>
+        <h2 style={{ fontSize: 18, marginBottom: 'var(--space-1)' }}>Email notification defaults</h2>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: 13, marginBottom: 'var(--space-3)' }}>
+          Applies to agents who haven't set their own preference. Personal settings on a profile always win.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {NOTIFICATION_TYPE_KEYS.map((key) => {
+            const isTaskOverdue = key === 'taskOverdue';
+            const checked = isTaskOverdue ? true : notificationDefaults[key] ?? true;
+            return (
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minHeight: 44 }}>
+                {/* A plain div, not a <label>, so this row's visible text doesn't create a second
+                    label association for the checkbox alongside its explicit aria-label above.
+                    The span's onClick restores the label-click affordance a <label> would give. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Email agents about ${NOTIFICATION_LABELS[key]} by default`}
+                    checked={checked}
+                    disabled={isTaskOverdue}
+                    onChange={(e) => toggleNotificationDefault(key, e.target.checked)}
+                    style={{ width: 18, height: 18 }}
+                  />
+                  <span
+                    onClick={isTaskOverdue ? undefined : () => toggleNotificationDefault(key, !checked)}
+                    style={{
+                      cursor: isTaskOverdue ? 'default' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      minHeight: 44,
+                    }}
+                  >
+                    {NOTIFICATION_LABELS[key]}
+                  </span>
+                </div>
+                {isTaskOverdue && (
+                  <span style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>
+                    Required — overdue task emails cannot be disabled.
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </Card>
     </div>
