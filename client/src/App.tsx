@@ -13,9 +13,14 @@ import { PostEditorPage } from './pages/PostEditorPage';
 import { PostPage } from './pages/PostPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ResourceDetailPage } from './pages/ResourceDetailPage';
+import { ResourceEditorPage } from './pages/ResourceEditorPage';
+import { ResourceHubPage } from './pages/ResourceHubPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
 import { TaskEditorPage } from './pages/TaskEditorPage';
 import { TasksPage } from './pages/TasksPage';
+import { BannersPage } from './pages/admin/BannersPage';
+import { CategoriesPage } from './pages/admin/CategoriesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { TemplatesPage } from './pages/admin/TemplatesPage';
 import { UsersPage } from './pages/admin/UsersPage';
@@ -59,6 +64,24 @@ export function App() {
         <Route path="/calendar/:id" element={<EventDetailPage />} />
         <Route path="/calendar/:id/edit" element={<EventEditorPage />} />
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/resources" element={<ResourceHubPage />} />
+        <Route
+          path="/resources/new"
+          element={
+            <RequireAuth min="officeAdmin">
+              <ResourceEditorPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="/resources/:id" element={<ResourceDetailPage />} />
+        <Route
+          path="/resources/:id/edit"
+          element={
+            <RequireAuth min="officeAdmin">
+              <ResourceEditorPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/tasks/new"
           element={
@@ -73,6 +96,22 @@ export function App() {
           element={
             <RequireAuth min="officeAdmin">
               <UsersPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/categories"
+          element={
+            <RequireAuth min="officeAdmin">
+              <CategoriesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/banners"
+          element={
+            <RequireAuth min="officeAdmin">
+              <BannersPage />
             </RequireAuth>
           }
         />

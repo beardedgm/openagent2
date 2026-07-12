@@ -8,6 +8,7 @@ export const createTaskSchema = z.object({
   priority: z.enum(TASK_PRIORITIES).optional(),
   dueAt: z.string().datetime({ offset: true }).nullable().optional(),
   recurrence: z.enum(RECURRENCE).optional(),
+  relatedResourceId: z.string().nullable().optional(),
   audience: z.object({
     type: z.enum(AUDIENCE_TYPES),
     userIds: z.array(z.string()).max(500).optional(),

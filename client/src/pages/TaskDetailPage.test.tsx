@@ -8,7 +8,12 @@ import { TaskDetailPage } from './TaskDetailPage';
 const { getMock, postMock } = vi.hoisted(() => ({ getMock: vi.fn(), postMock: vi.fn(async () => ({ data: {} })) }));
 vi.mock('../api/client', () => ({ api: { get: getMock, post: postMock, delete: vi.fn() } }));
 
-function mockApi({ role = 'agent', completedAt = null as string | null, matrix = undefined as unknown }) {
+function mockApi({
+  role = 'agent',
+  completedAt = null as string | null,
+  matrix = undefined as unknown,
+  relatedResourceId = null as string | null,
+}) {
   getMock.mockImplementation(async (url: string) => {
     if (url === '/auth/me') return { data: { user: { id: 'me', role, displayName: 'Me', officeId: null } } };
     if (url === '/tasks/t1')
@@ -20,9 +25,21 @@ function mockApi({ role = 'agent', completedAt = null as string | null, matrix =
             attachments: [{ name: 'guide.pdf', size: 100, contentType: 'application/pdf' }],
             recurrence: 'none', isOnboarding: false,
             myCompletion: { completedAt, note: '' }, counts: { total: 2, completed: 0 },
+            relatedResourceId,
             createdAt: new Date().toISOString(),
           },
           ...(matrix ? { matrix } : {}),
+        },
+      };
+    if (url === '/resources/r9')
+      return {
+        data: {
+          resource: {
+            id: 'r9', title: 'Buyer checklist', description: '', kind: 'link', externalUrl: 'https://x.example.com',
+            fileType: 'link', categoryId: 'c1', subcategoryId: null, uploadedBy: 'u1', officeId: null,
+            featured: false, currentFile: null, bookmarked: false,
+            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+          },
         },
       };
     throw new Error(`Unhandled GET ${url}`);
@@ -95,5 +112,12 @@ describe('TaskDetailPage', () => {
     render(wrap());
     await screen.findByText('File the form');
     expect(screen.queryByRole('button', { name: /add attachment/i })).not.toBeInTheDocument();
+  });
+
+  it('links to the related resource when the task has one', async () => {
+    mockApi({ relatedResourceId: 'r9' });
+    render(wrap());
+    const link = await screen.findByRole('link', { name: /buyer checklist/i });
+    expect(link).toHaveAttribute('href', '/resources/r9');
   });
 });

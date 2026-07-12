@@ -21,6 +21,7 @@ function task(overrides: Partial<TaskInfo>): TaskInfo {
     isOnboarding: false,
     myCompletion: { completedAt: null, note: '' },
     counts: { total: 1, completed: 0 },
+    relatedResourceId: null,
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -54,6 +55,7 @@ describe('DashboardPage', () => {
     getMock.mockImplementation(async (url: string) => {
       if (url === '/auth/me') return { data: { user: { id: 'me', role: 'agent', displayName: 'Me', officeId: null } } };
       if (url === '/settings') return { data: { settings } };
+      if (url === '/banners/active') return { data: { banners: [] } };
       if (url.startsWith('/tasks?')) {
         return {
           data: {
@@ -82,6 +84,7 @@ describe('DashboardPage', () => {
     getMock.mockImplementation(async (url: string) => {
       if (url === '/auth/me') return { data: { user: { id: 'me', role: 'agent', displayName: 'Me', officeId: null } } };
       if (url === '/settings') return { data: { settings } };
+      if (url === '/banners/active') return { data: { banners: [] } };
       if (url.startsWith('/tasks?')) return { data: { tasks: [] } };
       if (url === '/tasks/onboarding/mine') return { data: { total: 3, completed: 3 } };
       throw new Error(`Unhandled GET ${url}`);
@@ -97,6 +100,7 @@ describe('DashboardPage', () => {
     getMock.mockImplementation(async (url: string) => {
       if (url === '/auth/me') return { data: { user: { id: 'me', role: 'agent', displayName: 'Me', officeId: null } } };
       if (url === '/settings') return { data: { settings } };
+      if (url === '/banners/active') return { data: { banners: [] } };
       if (url.startsWith('/tasks?')) {
         return {
           data: {

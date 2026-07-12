@@ -35,6 +35,7 @@ const EMAIL_PREFS: { key: string; label: string; adminOnly?: boolean; defaultOn?
   { key: 'mandatoryEvent', label: 'Mandatory event announcements' },
   // Opt-IN (PRD 5.4): event reminders are off unless enabled.
   { key: 'eventReminders', label: 'Event reminders (24h and 1h before)', defaultOn: false },
+  { key: 'bookmarkedResource', label: 'New resources in categories I follow' },
 ];
 
 export function ProfilePage() {

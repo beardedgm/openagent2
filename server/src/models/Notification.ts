@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-// Stage 4 appends bookmarkedResource — extend this enum, never hardcode strings.
+// Stage 4 adds bookmarkedResource — extend this enum, never hardcode strings.
 export const NOTIFICATION_TYPES = [
   'invitationAccepted',
   'postPublished',
@@ -8,6 +8,7 @@ export const NOTIFICATION_TYPES = [
   'taskDueSoon',
   'taskOverdue',
   'mandatoryEvent',
+  'bookmarkedResource',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

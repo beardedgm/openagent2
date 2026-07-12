@@ -1,5 +1,6 @@
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { Resource } from '../models/Resource.js';
 import { Task, type TaskDoc, type TaskPriority } from '../models/Task.js';
 import { TaskTemplate } from '../models/TaskTemplate.js';
 import type { UserDoc } from '../models/User.js';
@@ -19,6 +20,7 @@ export interface TaskInput {
   priority?: TaskPriority;
   dueAt?: string | null;
   recurrence?: 'none' | 'daily' | 'weekly' | 'monthly';
+  relatedResourceId?: string | null;
   audience: { type: 'users' | 'office' | 'all'; userIds?: string[]; officeId?: string | null };
 }
 
@@ -42,6 +44,9 @@ export async function createTask(
   };
   const memberIds = await resolveAudience(audience);
   if (memberIds.length === 0) throw new AppError(400, 'No active users match that audience');
+  if (input.relatedResourceId && !(await Resource.exists({ _id: input.relatedResourceId }))) {
+    throw new AppError(400, 'Unknown resource');
+  }
 
   const now = new Date();
   const task = await Task.create({
@@ -53,6 +58,7 @@ export async function createTask(
     dueAt: input.dueAt ? new Date(input.dueAt) : null,
     recurrence: input.recurrence ?? 'none',
     nextRecurrenceAt: input.recurrence && input.recurrence !== 'none' ? nextRecurrence(now, input.recurrence) : null,
+    relatedResourceId: input.relatedResourceId ?? null,
     audience,
     completions: memberIds.map((userId) => ({ userId })),
     isOnboarding: opts.isOnboarding ?? false,

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Category } from '../src/models/Category.js';
 import { Notification } from '../src/models/Notification.js';
+import { Resource } from '../src/models/Resource.js';
 import { Task } from '../src/models/Task.js';
 import { User } from '../src/models/User.js';
 import { addMonthsClamped } from '../src/utils/recurrence.js';
@@ -76,7 +78,19 @@ describe('sweepTasks', () => {
   it('spawns recurring instances, re-resolving the audience, exactly once per due date', async () => {
     const broker = await makeUser('s8@x.com', 'broker');
     await makeUser('s9@x.com');
-    const parent = await createTask({ title: 'Weekly report', audience: { type: 'all' }, recurrence: 'weekly' }, broker);
+    const cat = await Category.create({ name: 'SweepDocs' });
+    const resource = await Resource.create({
+      title: 'Weekly checklist',
+      kind: 'link',
+      externalUrl: 'https://sweep.example.com',
+      categoryId: cat.id,
+      uploadedBy: broker.id,
+      fileType: 'link',
+    });
+    const parent = await createTask(
+      { title: 'Weekly report', audience: { type: 'all' }, recurrence: 'weekly', relatedResourceId: resource.id },
+      broker,
+    );
     await Task.updateOne({ _id: parent.id }, { $set: { nextRecurrenceAt: new Date(Date.now() - 60_000) } });
     await makeUser('s10@x.com'); // joins AFTER parent creation — must be in the spawned instance
     await sweepTasks();
@@ -85,6 +99,7 @@ describe('sweepTasks', () => {
     expect(spawned).toHaveLength(1);
     expect(spawned[0].recurrence).toBe('none');
     expect(spawned[0].completions).toHaveLength(3); // broker + both agents (fresh resolution)
+    expect(String(spawned[0].relatedResourceId)).toBe(resource.id); // resource link survives the clone
     const freshParent = (await Task.findById(parent.id))!;
     expect(freshParent.nextRecurrenceAt!.getTime()).toBeGreaterThan(Date.now());
   });

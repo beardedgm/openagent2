@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, ClipboardList, LayoutDashboard, LayoutTemplate, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, FolderOpen, FolderTree, Image, LayoutDashboard, LayoutTemplate, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -97,6 +97,10 @@ export function AppShell() {
             <ClipboardList size={18} />
             Tasks
           </NavLink>
+          <NavLink to="/resources" style={({ isActive }) => navLinkStyle(isActive)}>
+            <FolderOpen size={18} />
+            Resources
+          </NavLink>
           {isAdmin && (
             <>
               <div
@@ -115,6 +119,14 @@ export function AppShell() {
               <NavLink to="/admin/users" style={({ isActive }) => navLinkStyle(isActive)}>
                 <Users size={18} />
                 Users
+              </NavLink>
+              <NavLink to="/admin/categories" style={({ isActive }) => navLinkStyle(isActive)}>
+                <FolderTree size={18} />
+                Categories
+              </NavLink>
+              <NavLink to="/admin/banners" style={({ isActive }) => navLinkStyle(isActive)}>
+                <Image size={18} />
+                Banners
               </NavLink>
               {isBroker && (
                 <>

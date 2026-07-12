@@ -126,6 +126,7 @@ async function sweepRecurrence(now: Date): Promise<void> {
           descriptionHtml: parent.descriptionHtml,
           priority: parent.priority as never,
           dueAt: dueOffset !== null ? new Date(now.getTime() + dueOffset).toISOString() : null,
+          relatedResourceId: parent.relatedResourceId ? String(parent.relatedResourceId) : null,
           audience: {
             type: parent.audience.type as never,
             userIds: parent.audience.userIds.map(String),

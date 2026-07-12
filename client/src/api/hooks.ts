@@ -1,7 +1,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type {
+  BannerInfo,
   CalendarEventInfo,
+  Category,
   EventOccurrence,
   Invitation,
   NotificationsResponse,
@@ -9,6 +11,7 @@ import type {
   Post,
   PostComment,
   PublicSettings,
+  ResourceInfo,
   RsvpSummary,
   Settings,
   TaskInfo,
@@ -169,4 +172,154 @@ export function useOnboardingStatus(enabled: boolean) {
         .statuses,
     enabled,
   });
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => (await api.get<{ categories: Category[] }>('/categories')).data.categories,
+  });
+}
+
+export interface ResourceFilters {
+  q?: string;
+  categoryId?: string;
+  fileType?: string;
+  scope?: 'all' | 'mine';
+  page?: number;
+}
+
+export function useResources(filters: ResourceFilters = {}) {
+  const params = new URLSearchParams();
+  if (filters.q) params.set('q', filters.q);
+  if (filters.categoryId) params.set('categoryId', filters.categoryId);
+  if (filters.fileType) params.set('fileType', filters.fileType);
+  if (filters.scope === 'mine') params.set('scope', 'mine');
+  params.set('page', String(filters.page ?? 1));
+  return useQuery({
+    queryKey: ['resources', filters],
+    queryFn: async () =>
+      (await api.get<{ resources: ResourceInfo[]; total: number; page: number }>(`/resources?${params}`)).data,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useFeaturedResources() {
+  return useQuery({
+    queryKey: ['resources', 'featured'],
+    queryFn: async () => (await api.get<{ resources: ResourceInfo[] }>('/resources/featured')).data.resources,
+  });
+}
+
+export function useResource(id: string | undefined) {
+  return useQuery({
+    queryKey: ['resources', id],
+    queryFn: async () => (await api.get<{ resource: ResourceInfo }>(`/resources/${id}`)).data.resource,
+    enabled: !!id,
+  });
+}
+
+export function useResourceMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['resources'] });
+  return {
+    create: useMutation({
+      mutationFn: async (input: Record<string, unknown>) =>
+        (await api.post<{ resource: ResourceInfo }>('/resources', input)).data.resource,
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: async ({ id, ...patch }: { id: string } & Record<string, unknown>) =>
+        (await api.patch<{ resource: ResourceInfo }>(`/resources/${id}`, patch)).data.resource,
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: async (id: string) => (await api.delete(`/resources/${id}`)).data,
+      onSuccess: invalidate,
+    }),
+    uploadFile: useMutation({
+      mutationFn: async ({ id, file }: { id: string; file: File }) => {
+        const form = new FormData();
+        form.append('file', file);
+        return (await api.post<{ resource: ResourceInfo }>(`/resources/${id}/file`, form)).data.resource;
+      },
+      onSuccess: invalidate,
+    }),
+    setFeatured: useMutation({
+      mutationFn: async ({ id, featured }: { id: string; featured: boolean }) =>
+        featured ? (await api.post(`/resources/${id}/featured`)).data : (await api.delete(`/resources/${id}/featured`)).data,
+      onSuccess: invalidate,
+    }),
+    setBookmark: useMutation({
+      mutationFn: async ({ id, bookmarked }: { id: string; bookmarked: boolean }) =>
+        bookmarked ? (await api.post(`/resources/${id}/bookmark`)).data : (await api.delete(`/resources/${id}/bookmark`)).data,
+      onSuccess: invalidate,
+    }),
+  };
+}
+
+export function useCategoryMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['categories'] });
+  return {
+    create: useMutation({
+      mutationFn: async (input: { name: string; parentId?: string | null }) =>
+        (await api.post<{ category: Category }>('/categories', input)).data.category,
+      onSuccess: invalidate,
+    }),
+    rename: useMutation({
+      mutationFn: async ({ id, name }: { id: string; name: string }) =>
+        (await api.patch<{ category: Category }>(`/categories/${id}`, { name })).data.category,
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: async (id: string) => (await api.delete(`/categories/${id}`)).data,
+      onSuccess: invalidate,
+    }),
+  };
+}
+
+export function useActiveBanners() {
+  return useQuery({
+    queryKey: ['banners', 'active'],
+    queryFn: async () => (await api.get<{ banners: BannerInfo[] }>('/banners/active')).data.banners,
+    staleTime: 60_000,
+  });
+}
+
+export function useBanners() {
+  return useQuery({
+    queryKey: ['banners'],
+    queryFn: async () => (await api.get<{ banners: BannerInfo[] }>('/banners')).data.banners,
+  });
+}
+
+export function useBannerMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['banners'] });
+  return {
+    create: useMutation({
+      mutationFn: async (input: Record<string, unknown>) =>
+        (await api.post<{ banner: BannerInfo }>('/banners', input)).data.banner,
+      onSuccess: invalidate,
+    }),
+    update: useMutation({
+      mutationFn: async ({ id, ...patch }: { id: string } & Record<string, unknown>) =>
+        (await api.patch<{ banner: BannerInfo }>(`/banners/${id}`, patch)).data.banner,
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: async (id: string) => (await api.delete(`/banners/${id}`)).data,
+      onSuccess: invalidate,
+    }),
+    duplicate: useMutation({
+      mutationFn: async (id: string) => (await api.post<{ banner: BannerInfo }>(`/banners/${id}/duplicate`)).data.banner,
+      onSuccess: invalidate,
+    }),
+  };
+}
+
+/** Fire-and-forget click log; navigation happens regardless of logging success. */
+export function trackBannerClick(id: string): void {
+  void api.post(`/banners/${id}/click`).catch(() => {});
 }

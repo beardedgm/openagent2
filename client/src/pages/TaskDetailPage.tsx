@@ -2,9 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Paperclip } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
-import { useTask } from '../api/hooks';
+import { useResource, useTask } from '../api/hooks';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -13,6 +13,7 @@ import { Spinner } from '../components/ui/Spinner';
 export function TaskDetailPage() {
   const { id } = useParams();
   const { data, isLoading, error } = useTask(id);
+  const { data: relatedResource } = useResource(data?.task.relatedResourceId ?? undefined);
   const qc = useQueryClient();
   const [note, setNote] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,6 +79,11 @@ export function TaskDetailPage() {
         <p style={{ marginTop: 'var(--space-1)', fontSize: 13, color: 'var(--color-text-muted)' }}>
           {task.dueAt ? `Due ${new Date(task.dueAt).toLocaleString()}` : 'No due date'}
         </p>
+        {relatedResource && (
+          <p style={{ fontSize: 14 }}>
+            Related resource: <Link to={`/resources/${relatedResource.id}`}>{relatedResource.title}</Link>
+          </p>
+        )}
         {task.descriptionHtml && (
           // Server-sanitized at write time (sanitize-html allowlist) — the only reason this is safe.
           <div style={{ marginTop: 'var(--space-3)' }} dangerouslySetInnerHTML={{ __html: task.descriptionHtml }} />

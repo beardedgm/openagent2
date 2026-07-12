@@ -93,6 +93,7 @@ function mockApi() {
     if (url === '/auth/me') return { data: { user: me } };
     if (url === '/settings') return { data: { settings } };
     if (url.startsWith('/users')) return { data: { users: [activeUser1, activeUser2, deactivatedUser] } };
+    if (url.startsWith('/resources?')) return { data: { resources: [], total: 0, page: 1 } };
     throw new Error(`Unhandled GET ${url}`);
   });
 }

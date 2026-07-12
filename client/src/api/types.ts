@@ -161,6 +161,7 @@ export interface TaskInfo {
   isOnboarding: boolean;
   myCompletion: { completedAt: string | null; note: string } | null;
   counts: { total: number; completed: number };
+  relatedResourceId: string | null;
   createdAt: string;
 }
 
@@ -186,4 +187,52 @@ export interface OnboardingProgress {
 export interface ReservableResource {
   _id: string;
   name: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  parentId: string | null;
+}
+
+export interface ResourceVersion {
+  name: string;
+  size: number;
+  contentType: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface ResourceInfo {
+  id: string;
+  title: string;
+  description: string;
+  kind: 'file' | 'link';
+  externalUrl: string;
+  fileType: string;
+  categoryId: string;
+  subcategoryId: string | null;
+  uploadedBy: string;
+  officeId: string | null;
+  featured: boolean;
+  currentFile: { name: string; size: number; contentType: string } | null;
+  bookmarked: boolean;
+  versions?: ResourceVersion[]; // present for officeAdmin+ only
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BannerInfo {
+  id: string;
+  kind: 'image' | 'text';
+  title: string;
+  imageUrl: string;
+  bodyHtml: string;
+  ctaLabel: string;
+  ctaUrl: string;
+  officeId: string | null;
+  startAt: string;
+  endAt: string;
+  clickCount: number;
+  createdAt: string;
 }
