@@ -42,6 +42,9 @@ export function createApp(): express.Express {
             directives: {
               ...helmet.contentSecurityPolicy.getDefaultDirectives(),
               'img-src': ["'self'", 'data:', 'https:'],
+              // Turnstile loads its widget script and challenge iframe from this origin
+              'script-src': ["'self'", 'https://challenges.cloudflare.com'],
+              'frame-src': ["'self'", 'https://challenges.cloudflare.com'],
             },
           }
         : false,
