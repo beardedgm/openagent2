@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CategoriesPage } from './CategoriesPage';
 
 const { getMock, postMock, deleteMock } = vi.hoisted(() => ({
@@ -40,6 +40,10 @@ function wrap() {
 }
 
 describe('CategoriesPage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders the tree and adds a top-level category', async () => {
     mockApi();
     render(wrap());
@@ -66,6 +70,9 @@ describe('CategoriesPage', () => {
       isAxiosError: true,
       response: { data: { error: 'Move or delete the resources in this category first' } },
     });
+    // Approved post-plan amendment: delete now asks for confirmation first (matching the
+    // UsersPage deactivate and ResourceDetailPage delete flows), so accept the dialog here.
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(wrap());
     await userEvent.click(await screen.findByRole('button', { name: /delete social/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/resources in this category/i);

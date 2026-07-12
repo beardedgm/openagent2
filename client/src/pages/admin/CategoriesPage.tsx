@@ -52,7 +52,12 @@ export function CategoriesPage() {
           <button
             type="button"
             aria-label={`Delete ${c.name}`}
-            onClick={() => { setError(''); remove.mutate(c.id, { onError: fail }); }}
+            onClick={() => {
+              if (window.confirm(`Delete the category "${c.name}"?`)) {
+                setError('');
+                remove.mutate(c.id, { onError: fail });
+              }
+            }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', minWidth: 44, minHeight: 44, color: 'var(--color-danger)' }}
           >
             <Trash2 size={15} />
