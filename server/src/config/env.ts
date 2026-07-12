@@ -29,6 +29,7 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('workspace@localhost'),
   TURNSTILE_SECRET_KEY: z.string().optional(),
+  SENTRY_DSN: z.string().optional(),
 });
 
 export const env = schema.parse(process.env);

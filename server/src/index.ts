@@ -8,6 +8,11 @@ import { registerJobs } from './jobs/index.js';
 async function start(): Promise<void> {
   await connectDb();
   await startAgenda(registerJobs);
+  if (env.SENTRY_DSN) {
+    const Sentry = await import('@sentry/node');
+    Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV });
+    logger.info('sentry enabled');
+  }
   if (env.NODE_ENV === 'production' && !env.TURNSTILE_SECRET_KEY)
     logger.warn('TURNSTILE_SECRET_KEY not set — bot protection is disabled in production');
   if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER === 'r2' && !env.R2_PRIVATE_BUCKET)
