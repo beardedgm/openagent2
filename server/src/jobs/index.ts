@@ -2,6 +2,7 @@ import type { Agenda, Job } from 'agenda';
 import { publishPostSideEffects } from '../services/postService.js';
 import { sweepEventReminders } from './eventReminders.js';
 import { pollAllFeeds } from './pollRss.js';
+import { sweepRetention } from './retentionSweep.js';
 import { sweepTasks } from './taskSweep.js';
 
 export function registerJobs(agenda: Agenda): void {
@@ -17,5 +18,8 @@ export function registerJobs(agenda: Agenda): void {
   });
   agenda.define('task-sweep', async () => {
     await sweepTasks();
+  });
+  agenda.define('retention-sweep', async () => {
+    await sweepRetention();
   });
 }
