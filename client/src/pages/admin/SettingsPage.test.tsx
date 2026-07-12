@@ -12,6 +12,12 @@ const { getMock, postMock, patchMock } = vi.hoisted(() => ({
 vi.mock('../../api/client', () => ({
   api: { get: getMock, post: postMock, patch: patchMock },
 }));
+// The rich text editor drags in TipTap; the form only needs its value contract.
+vi.mock('../../components/RichTextEditor', () => ({
+  RichTextEditor: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <textarea aria-label="Welcome message" value={value} onChange={(e) => onChange(e.target.value)} />
+  ),
+}));
 
 const brokerUser = {
   id: 'b1',
@@ -36,7 +42,7 @@ const serverSettings = {
   rssFeeds: [],
   welcomeMessage: '',
   quickLinks: [],
-  homepageLayout: [],
+  homepageLayout: ['welcome', 'banners', 'announcements', 'myTasks', 'events', 'feed', 'quickLinks'],
   reservableResources: [{ _id: 'r1', name: 'Conference Room A' }],
   onboardingTaskTemplateId: null,
 };
@@ -123,5 +129,81 @@ describe('SettingsPage', () => {
 
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
     expect(screen.getByText('Enter a 6-digit hex color like #1a2b3c')).toBeInTheDocument();
+  });
+
+  it('lists all seven homepage widgets checked and reorders via Up/Down into the save body', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    for (const label of [
+      'Welcome message',
+      'Banner ads',
+      'Pinned announcements',
+      'My tasks',
+      'Upcoming events',
+      'Activity feed preview',
+      'Quick links',
+    ]) {
+      expect(screen.getByLabelText(`Show ${label} widget`)).toBeChecked();
+    }
+
+    // "Welcome message" is first (index 0) so its Up button is disabled; move "Banner ads" up instead.
+    expect(screen.getByLabelText('Move Welcome message up')).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Move Banner ads up'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await screen.findByText('Saved');
+    const body = patchMock.mock.calls[0][1];
+    expect(body.homepageLayout).toEqual([
+      'banners',
+      'welcome',
+      'announcements',
+      'myTasks',
+      'events',
+      'feed',
+      'quickLinks',
+    ]);
+  });
+
+  it('removes a disabled widget from the saved homepageLayout', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    fireEvent.click(screen.getByLabelText('Show Banner ads widget'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await screen.findByText('Saved');
+    const body = patchMock.mock.calls[0][1];
+    expect(body.homepageLayout).toEqual(['welcome', 'announcements', 'myTasks', 'events', 'feed', 'quickLinks']);
+  });
+
+  it('round-trips the welcome message and quick links into the save body', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    fireEvent.change(screen.getByLabelText('Welcome message'), { target: { value: '<p>Hi team</p>' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    fireEvent.change(screen.getByLabelText('Quick link 1 label'), { target: { value: 'Directory' } });
+    fireEvent.change(screen.getByLabelText('Quick link 1 URL'), { target: { value: '/directory' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await screen.findByText('Saved');
+    const body = patchMock.mock.calls[0][1];
+    expect(body.welcomeMessage).toBe('<p>Hi team</p>');
+    expect(body.quickLinks).toEqual([{ label: 'Directory', url: '/directory' }]);
+  });
+
+  it('blocks Save with a hint while a quick link URL is invalid', async () => {
+    render(wrap());
+    await screen.findByLabelText('Office 1 name');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    fireEvent.change(screen.getByLabelText('Quick link 1 label'), { target: { value: 'Bad' } });
+    fireEvent.change(screen.getByLabelText('Quick link 1 URL'), { target: { value: 'ftp://x' } });
+
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    expect(screen.getByText('Every quick link URL must start with http://, https://, or / before you can save.')).toBeInTheDocument();
   });
 });

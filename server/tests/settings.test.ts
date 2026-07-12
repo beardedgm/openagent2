@@ -130,6 +130,29 @@ describe('settings', () => {
     );
   });
 
+  it('accepts internal-path and http(s) quickLinks urls; round-trips verbatim', async () => {
+    const broker = await loginAs(app, 'b11@x.com', 'broker');
+    const res = await broker.patch('/api/v1/admin/settings').send({
+      quickLinks: [
+        { label: 'Directory', url: '/directory' },
+        { label: 'Docs', url: 'https://docs.example.com' },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.settings.quickLinks).toEqual([
+      { label: 'Directory', url: '/directory' },
+      { label: 'Docs', url: 'https://docs.example.com' },
+    ]);
+  });
+
+  it('rejects quickLinks urls that are not http(s) or an internal path', async () => {
+    const broker = await loginAs(app, 'b12@x.com', 'broker');
+    const rejected = await broker
+      .patch('/api/v1/admin/settings')
+      .send({ quickLinks: [{ label: 'Bad', url: 'javascript:alert(1)' }] });
+    expect(rejected.status).toBe(400);
+  });
+
   it('broker sets notificationDefaults; round-trips on GET', async () => {
     const broker = await loginAs(app, 'b9@x.com', 'broker');
     const res = await broker.patch('/api/v1/admin/settings').send({ notificationDefaults: { postPublished: false } });
