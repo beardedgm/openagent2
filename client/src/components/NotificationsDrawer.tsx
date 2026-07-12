@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useNotifications } from '../api/hooks';
 import type { NotificationItem } from '../api/types';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { Button } from './ui/Button';
 
 export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -12,25 +13,8 @@ export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose:
   const { data } = useNotifications(false);
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  // Focus the close button on open, close on Escape, and restore focus on close.
-  // Full focus trap is deferred alongside the sidebar-overlay backlog item.
-  useEffect(() => {
-    if (!open) return;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    closeButtonRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      previouslyFocused?.focus();
-    };
-  }, [open]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef, open, onClose);
 
   const markRead = useMutation({
     mutationFn: (id: string) => api.post(`/notifications/${id}/read`),
@@ -53,6 +37,7 @@ export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose:
     <>
       <div onClick={onClose} style={{ position: 'fixed', inset: '64px 0 0 0', zIndex: 29 }} />
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"
@@ -84,7 +69,6 @@ export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose:
             Mark all read
           </Button>
           <button
-            ref={closeButtonRef}
             aria-label="Close notifications"
             onClick={onClose}
             style={{

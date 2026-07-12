@@ -1,9 +1,27 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '../api/types';
+import { useUiStore } from '../store/uiStore';
 import { AppShell } from './AppShell';
+
+function stubNarrowViewport(matches: boolean) {
+  const original = window.matchMedia;
+  window.matchMedia = ((query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+  return () => {
+    window.matchMedia = original;
+  };
+}
 
 const { getMock, postMock } = vi.hoisted(() => ({
   getMock: vi.fn(),
@@ -97,5 +115,43 @@ describe('AppShell', () => {
     rerender(element);
 
     expect(postMock).toHaveBeenCalledTimes(1);
+  });
+
+  describe('narrow-viewport sidebar overlay', () => {
+    afterEach(() => {
+      useUiStore.setState({ sidebarOpen: window.innerWidth > 880 });
+    });
+
+    it('renders a scrim behind the open sidebar and closes on scrim click', async () => {
+      const restoreMatchMedia = stubNarrowViewport(true);
+      mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+      useUiStore.setState({ sidebarOpen: true });
+
+      render(wrap());
+      await screen.findByText('Acme Realty');
+
+      const scrim = document.querySelector('[data-testid="sidebar-scrim"]');
+      expect(scrim).toBeInTheDocument();
+      expect(scrim).toHaveAttribute('aria-hidden', 'true');
+
+      fireEvent.click(scrim!);
+      expect(useUiStore.getState().sidebarOpen).toBe(false);
+
+      restoreMatchMedia();
+    });
+
+    it('closes the sidebar on Escape', async () => {
+      const restoreMatchMedia = stubNarrowViewport(true);
+      mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+      useUiStore.setState({ sidebarOpen: true });
+
+      render(wrap());
+      await screen.findByText('Acme Realty');
+
+      fireEvent.keyDown(screen.getByRole('navigation', { name: /main navigation/i }), { key: 'Escape' });
+      expect(useUiStore.getState().sidebarOpen).toBe(false);
+
+      restoreMatchMedia();
+    });
   });
 });

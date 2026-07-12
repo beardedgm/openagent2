@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useLogout, useMe, useNotifications, usePublicSettings } from '../api/hooks';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUiStore } from '../store/uiStore';
 import { applyAccentColor } from '../utils/applyAccentColor';
 import { NotificationsDrawer } from './NotificationsDrawer';
@@ -39,6 +40,23 @@ function navLinkStyle(isActive: boolean): CSSProperties {
   };
 }
 
+// Tracks whether the viewport is at or below the sidebar-collapse breakpoint, updating
+// live as the viewport is resized (e.g. rotating a tablet or resizing a desktop window).
+function useNarrowViewport(breakpoint: number) {
+  const query = `(max-width: ${breakpoint}px)`;
+  const [narrow, setNarrow] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia ? false : window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia(query);
+    const onChange = () => setNarrow(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [query]);
+  return narrow;
+}
+
 export function AppShell() {
   const { data: branding } = usePublicSettings();
   const { data: me } = useMe();
@@ -49,6 +67,9 @@ export function AppShell() {
   const [notifOpen, setNotifOpen] = useState(false);
   const { data: notifData } = useNotifications();
   const unread = notifData?.unreadCount ?? 0;
+  const narrow = useNarrowViewport(SIDEBAR_COLLAPSE_BREAKPOINT);
+  const sidebarRef = useRef<HTMLElement>(null);
+  useFocusTrap(sidebarRef, sidebarOpen && narrow, toggleSidebar);
 
   useEffect(() => {
     if (branding?.primaryColor) applyAccentColor(branding.primaryColor);
@@ -70,6 +91,7 @@ export function AppShell() {
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-bg)' }}>
       {sidebarOpen && (
         <nav
+          ref={sidebarRef}
           aria-label="Main navigation"
           className="app-shell-sidebar"
           style={{
@@ -153,6 +175,19 @@ export function AppShell() {
             </>
           )}
         </nav>
+      )}
+      {sidebarOpen && narrow && (
+        <div
+          data-testid="sidebar-scrim"
+          aria-hidden="true"
+          onClick={toggleSidebar}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 19,
+            background: 'rgba(0, 0, 0, 0.4)',
+          }}
+        />
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header
