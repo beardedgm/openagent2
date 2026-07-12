@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useMe, useMyOnboarding, useSettings, useTasks } from '../api/hooks';
+import { BannerSlot } from '../components/BannerSlot';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
 import { isOverdue } from './TasksPage';
@@ -19,6 +20,7 @@ export function DashboardPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      <BannerSlot />
       <h1 style={{ fontSize: 24 }}>Welcome back, {me?.displayName}</h1>
 
       {settings?.welcomeMessage && (
