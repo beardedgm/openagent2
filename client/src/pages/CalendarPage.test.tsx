@@ -7,8 +7,12 @@ import { CalendarPage } from './CalendarPage';
 
 const dayLabel = (d: Date) => d.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
 
-const { getMock } = vi.hoisted(() => ({ getMock: vi.fn() }));
+const { getMock, navigateMock } = vi.hoisted(() => ({ getMock: vi.fn(), navigateMock: vi.fn() }));
 vi.mock('../api/client', () => ({ api: { get: getMock } }));
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => navigateMock,
+}));
 
 function mockApi(occurrences: unknown[]) {
   getMock.mockImplementation(async (url: string) => {
@@ -131,5 +135,48 @@ describe('CalendarPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     const firstOfJuly = await screen.findByRole('gridcell', { name: new RegExp(`^${dayLabel(new Date(2026, 6, 1))}, `) });
     expect(firstOfJuly).toHaveAttribute('tabindex', '0');
+  });
+
+  it('lets a focused event chip handle Enter itself instead of hijacking it for the roving cell', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 5, 15)); // June 15, 2026: roving tabindex defaults to today
+    navigateMock.mockClear();
+    mockApi([occ('Alpha', new Date(2026, 5, 15, 9, 0)), occ('Beta', new Date(2026, 5, 16, 9, 0))]);
+    render(wrap());
+    await screen.findByText('Beta');
+
+    // Enter on Beta's chip (June 16) must NOT activate the roving cell's (June 15) first chip.
+    const betaChip = screen.getByRole('button', { name: 'Beta' });
+    betaChip.focus();
+    fireEvent.keyDown(betaChip, { key: 'Enter' });
+    expect(navigateMock).not.toHaveBeenCalledWith('/calendar/e-Alpha');
+
+    // The chip's own activation still navigates to its event.
+    fireEvent.click(betaChip);
+    expect(navigateMock).toHaveBeenCalledWith('/calendar/e-Beta');
+  });
+
+  it('still handles arrow keys from a day cell and prevents default on clamped edge moves', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 5, 15)); // June 15, 2026 (grid rows: May 31-Jun 6, Jun 7-13, Jun 14-20, ...)
+    mockApi([]);
+    render(wrap());
+    await screen.findByText('Sun');
+
+    const cellFor = (d: Date) => screen.getByRole('gridcell', { name: new RegExp(`^${dayLabel(d)}, `) });
+    const start = cellFor(new Date(2026, 5, 15));
+    start.focus();
+    fireEvent.keyDown(start, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(cellFor(new Date(2026, 5, 16)));
+
+    // Walk to the top row, then ArrowUp off the grid: focus stays put but the key is still
+    // consumed (preventDefault) so the page does not scroll.
+    fireEvent.keyDown(cellFor(new Date(2026, 5, 16)), { key: 'ArrowUp' });
+    fireEvent.keyDown(cellFor(new Date(2026, 5, 9)), { key: 'ArrowUp' });
+    const topRowCell = cellFor(new Date(2026, 5, 2));
+    expect(document.activeElement).toBe(topRowCell);
+    const notPrevented = fireEvent.keyDown(topRowCell, { key: 'ArrowUp' });
+    expect(notPrevented).toBe(false); // false = defaultPrevented
+    expect(document.activeElement).toBe(topRowCell);
   });
 });

@@ -86,6 +86,8 @@ export function CalendarPage() {
   }
 
   function handleMonthGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    // Only handle keys originating from a day cell — chips/'+N more' buttons handle their own Enter/Space.
+    if (!(e.target instanceof HTMLElement) || !e.target.hasAttribute('data-date')) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       activateDayCell(tabbableDay);
@@ -93,13 +95,12 @@ export function CalendarPage() {
     }
     const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' ? 7 : e.key === 'ArrowUp' ? -7 : null;
     if (delta === null) return;
+    // Consume handled arrow keys even when the move is clamped, so edge presses don't scroll the page.
+    e.preventDefault();
     const next = addDays(tabbableDay, delta);
     // Clamp to the 42 rendered day cells of the currently displayed grid (including muted
     // lead/trail days from adjacent months) rather than hopping to a new month view.
-    if (monthCells.some((c) => sameLocalDay(c.date, next))) {
-      e.preventDefault();
-      setFocusedDay(next);
-    }
+    if (monthCells.some((c) => sameLocalDay(c.date, next))) setFocusedDay(next);
   }
 
   const title =
