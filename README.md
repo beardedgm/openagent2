@@ -2,7 +2,7 @@
 
 A single-tenant intranet for a real estate brokerage — announcements, shared calendar, resource hub, tasks, and staff onboarding in one workspace. TypeScript MERN monorepo (Express API + React SPA), designed to run for free on Render's free tier, MongoDB Atlas M0, and Cloudflare R2.
 
-**Status:** Stage 1 (Foundation) complete — auth & invitations, user management, staff directory/profiles, brokerage settings & branding, and the admin panel are built and tested. Stage 2 (Communications) complete — message board with rich-text announcements and comments, in-app + email notifications, and an activity feed with hourly RSS ingestion are built and tested. Stage 3 (Coordination) complete — shared calendar with RSVPs, reservable resources, and reminders; task management with templates, recurrence, and attachments; and structured onboarding are built and tested. Stage 4 (Content) complete — a resource hub with two-level categories, file (≤50MB, versioned) or link resources, office targeting, keyword search and filters, up to 6 featured tiles, bookmarks with a My Resources view, signed-URL downloads with engagement logging, and "new resource in a category I follow" notifications; and banner ads with image or rich-text homepage banners, CTAs, scheduling, office targeting, 5-second rotation when more than three are live, and click tracking visible in the admin view are built and tested. Stage 5 (dashboard & polish) is tracked in [docs/superpowers/plans/2026-07-09-roadmap.md](docs/superpowers/plans/2026-07-09-roadmap.md).
+**Status:** Stage 1 (Foundation) complete — auth & invitations, user management, staff directory/profiles, brokerage settings & branding, and the admin panel are built and tested. Stage 2 (Communications) complete — message board with rich-text announcements and comments, in-app + email notifications, and an activity feed with hourly RSS ingestion are built and tested. Stage 3 (Coordination) complete — shared calendar with RSVPs, reservable resources, and reminders; task management with templates, recurrence, and attachments; and structured onboarding are built and tested. Stage 4 (Content) complete — a resource hub with two-level categories, file (≤50MB, versioned) or link resources, office targeting, keyword search and filters, up to 6 featured tiles, bookmarks with a My Resources view, signed-URL downloads with engagement logging, and "new resource in a category I follow" notifications; and banner ads with image or rich-text homepage banners, CTAs, scheduling, office targeting, 5-second rotation when more than three are live, and click tracking visible in the admin view are built and tested. Stage 5 (Polish & Launch) complete — a configurable homepage dashboard with admin editors for widget layout, welcome message, and quick links; brokerage-wide notification defaults; `pageView` engagement analytics; retention jobs for activity/RSS/task history; an accessibility hardening pass covering focus management and calendar keyboard navigation; a code-split client bundle; optional Sentry error tracking; and a deployment runbook are built and tested. **Phase 1 of the PRD is complete.**
 
 ## Quick start
 
@@ -40,6 +40,7 @@ Prerequisites: Node 20+, a MongoDB instance (Atlas M0 free tier or local).
 | `RESEND_API_KEY`, `EMAIL_FROM` | Without a key, emails are logged to the server console in development; in production they are **not sent** and invitation endpoints report `emailSent: false`. |
 | `TURNSTILE_SECRET_KEY`, `VITE_TURNSTILE_SITE_KEY` | Bot protection is disabled (Turnstile checks pass through) when unset. |
 | `STORAGE_DRIVER=r2` + `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_BASE_URL` | Without `STORAGE_DRIVER=r2`, uploads are written to local disk. Fine for dev; production hosts with ephemeral disks (e.g. Render free tier) need R2 for uploads to persist. |
+| `SENTRY_DSN`, `VITE_SENTRY_DSN` | Error tracking is disabled when unset — the server never initializes Sentry and the client never loads `@sentry/react`. |
 
 ## Commands
 
@@ -69,7 +70,7 @@ The app builds and runs as a single service: `npm run build` then `npm start` se
 - Render's disk is ephemeral — set `STORAGE_DRIVER=r2` with the R2 variables above so uploads survive redeploys.
 - Free instances sleep after idle. A free [UptimeRobot](https://uptimerobot.com/) monitor pinging `/api/v1/health` keeps the service awake, comfortably within Render's 750 free hours/month.
 
-A full deployment runbook lands in Stage 5.
+See [docs/deploy.md](docs/deploy.md) for the full deployment runbook.
 
 ## Docs
 
@@ -80,4 +81,6 @@ A full deployment runbook lands in Stage 5.
 - [docs/superpowers/plans/2026-07-10-stage-2-communications.md](docs/superpowers/plans/2026-07-10-stage-2-communications.md) — Stage 2 implementation plan
 - [docs/superpowers/plans/2026-07-10-stage-3-coordination.md](docs/superpowers/plans/2026-07-10-stage-3-coordination.md) — Stage 3 implementation plan
 - [docs/superpowers/plans/2026-07-11-stage-4-content.md](docs/superpowers/plans/2026-07-11-stage-4-content.md) — Stage 4 implementation plan
+- [docs/superpowers/plans/2026-07-11-stage-5-polish-launch.md](docs/superpowers/plans/2026-07-11-stage-5-polish-launch.md) — Stage 5 implementation plan
+- [docs/deploy.md](docs/deploy.md) — deployment runbook
 - [DESIGN.md](DESIGN.md) — authoritative UI/UX reference
