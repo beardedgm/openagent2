@@ -13,7 +13,12 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
     logger.info({ to, subject, html }, 'email (console driver)');
     return true;
   }
-  await resend.emails.send({ from: env.EMAIL_FROM, to, subject, html });
+  // The Resend SDK reports API failures in its resolved value, not by throwing.
+  const { error } = await resend.emails.send({ from: env.EMAIL_FROM, to, subject, html });
+  if (error) {
+    logger.error({ to, subject, error: error.message }, 'resend send failed');
+    return false;
+  }
   return true;
 }
 
