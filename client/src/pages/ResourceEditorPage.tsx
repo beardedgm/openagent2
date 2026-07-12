@@ -92,7 +92,16 @@ export function ResourceEditorPage() {
         navigate(`/resources/${id}`);
       } else {
         const created = await create.mutateAsync({ ...body, kind });
-        if (kind === 'file' && file) await uploadFile.mutateAsync({ id: created.id, file });
+        if (kind === 'file' && file) {
+          // If the upload fails after the metadata create succeeded, still navigate to the detail
+          // page — the resource visibly exists there file-less, and its "Replace file" control is
+          // the retry path. Staying on the form would create a duplicate on resubmit.
+          try {
+            await uploadFile.mutateAsync({ id: created.id, file });
+          } catch {
+            // Recovery route: detail page's "Replace file" (no toast system yet).
+          }
+        }
         navigate(`/resources/${created.id}`);
       }
     } catch (err) {

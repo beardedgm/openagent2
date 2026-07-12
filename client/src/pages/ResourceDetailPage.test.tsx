@@ -75,4 +75,20 @@ describe('ResourceDetailPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: /feature this resource/i }));
     await waitFor(() => expect(postMock).toHaveBeenCalledWith('/resources/r1/featured'));
   });
+
+  it('shows a not-found message instead of a spinner when the resource 404s', async () => {
+    getMock.mockImplementation(async (url: string) => {
+      if (url === '/auth/me') return { data: { user: { id: 'me', role: 'agent', displayName: 'Me', officeId: null, emailPrefs: {} } } };
+      if (url === '/categories') return { data: { categories: [] } };
+      if (url === '/resources/r1')
+        throw Object.assign(new Error('Request failed with status code 404'), {
+          isAxiosError: true,
+          response: { status: 404, data: { error: 'Not found' } },
+        });
+      throw new Error(`unmocked ${url}`);
+    });
+    render(wrap());
+    expect(await screen.findByText(/resource not found/i)).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });

@@ -1,7 +1,9 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bookmark as BookmarkIcon, Pencil, Star, Trash2, Upload } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { api } from '../api/client';
 import { useCategories, useMe, useResource, useResourceMutations } from '../api/hooks';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
@@ -13,16 +15,38 @@ export function ResourceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { data: me } = useMe();
-  const { data: resource, isLoading } = useResource(id);
+  const { data: resource, isLoading, error: loadError } = useResource(id);
   const { data: categories } = useCategories();
-  const { remove, uploadFile, setFeatured, setBookmark } = useResourceMutations();
+  const { uploadFile, setFeatured, setBookmark } = useResourceMutations();
+  const qc = useQueryClient();
   const [error, setError] = useState('');
-  if (isLoading || !resource || !me) return <Spinner />;
-  const isAdmin = me.role === 'broker' || me.role === 'officeAdmin';
-  const nameOf = (cid: string | null) => (cid && (categories ?? []).find((c) => c.id === cid)?.name) || '';
 
   const fail = (err: unknown) =>
     setError(isAxiosError(err) ? (err.response?.data?.error ?? 'Something went wrong') : 'Something went wrong');
+
+  const deleteResource = useMutation({
+    mutationFn: () => api.delete(`/resources/${id}`),
+    onSuccess: () => {
+      // Navigate first — invalidating while this page is still mounted refetches the deleted resource into a 404.
+      navigate('/resources');
+      void qc.invalidateQueries({ queryKey: ['resources'] });
+    },
+    onError: fail,
+  });
+
+  if (isLoading || !me) return <Spinner />;
+  if (!resource) {
+    if (isAxiosError(loadError) && loadError.response?.status === 404) {
+      return (
+        <Card>
+          <h2 style={{ fontSize: 18 }}>Resource not found</h2>
+        </Card>
+      );
+    }
+    return null;
+  }
+  const isAdmin = me.role === 'broker' || me.role === 'officeAdmin';
+  const nameOf = (cid: string | null) => (cid && (categories ?? []).find((c) => c.id === cid)?.name) || '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', maxWidth: 720 }}>
@@ -74,9 +98,10 @@ export function ResourceDetailPage() {
             )}
             <Button
               variant="danger"
+              disabled={deleteResource.isPending}
               onClick={() => {
                 if (window.confirm('Delete this resource? Bookmarks to it are removed too.')) {
-                  remove.mutate(resource.id, { onSuccess: () => navigate('/resources'), onError: fail });
+                  deleteResource.mutate();
                 }
               }}
             >
@@ -99,11 +124,22 @@ export function ResourceDetailPage() {
                   </li>
                 ))}
               </ol>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44, fontSize: 14, cursor: 'pointer' }}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  minHeight: 44,
+                  fontSize: 14,
+                  cursor: uploadFile.isPending ? 'not-allowed' : 'pointer',
+                  opacity: uploadFile.isPending ? 0.5 : 1,
+                }}
+              >
                 <Upload size={16} /> Replace file (new version)
                 <input
                   type="file"
                   aria-label="Replace file"
+                  disabled={uploadFile.isPending}
                   style={{ display: 'none' }}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
