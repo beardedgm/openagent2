@@ -49,7 +49,7 @@ export function BannerSlot() {
           ) : (
             <div style={{ padding: 'var(--space-3)' }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{b.title}</div>
-              {/* Server-sanitized via sanitizePostHtml — same trust boundary as post bodies. */}
+              {/* Server-sanitized via sanitizeBannerHtml — same trust boundary as post bodies. */}
               <div style={{ fontSize: 13 }} dangerouslySetInnerHTML={{ __html: b.bodyHtml }} />
               {b.ctaLabel && <span style={{ color: 'var(--color-accent)', fontSize: 13, fontWeight: 600 }}>{b.ctaLabel} →</span>}
             </div>

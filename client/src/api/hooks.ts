@@ -255,10 +255,6 @@ export function useResourceMutations() {
         (await api.patch<{ resource: ResourceInfo }>(`/resources/${id}`, patch)).data.resource,
       onSuccess: invalidate,
     }),
-    remove: useMutation({
-      mutationFn: async (id: string) => (await api.delete(`/resources/${id}`)).data,
-      onSuccess: invalidate,
-    }),
     uploadFile: useMutation({
       mutationFn: async ({ id, file }: { id: string; file: File }) => {
         const form = new FormData();
