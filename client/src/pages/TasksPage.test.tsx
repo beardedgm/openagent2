@@ -14,6 +14,7 @@ function task(overrides: Partial<TaskInfo>): TaskInfo {
     id: 't1', title: 'T', descriptionHtml: '', createdBy: 'b', priority: 'Medium', dueAt: null,
     attachments: [], recurrence: 'none', isOnboarding: false,
     myCompletion: { completedAt: null, note: '' }, counts: { total: 1, completed: 0 },
+    relatedResourceId: null,
     createdAt: new Date().toISOString(),
     ...overrides,
   };

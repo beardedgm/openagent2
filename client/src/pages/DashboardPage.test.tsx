@@ -21,6 +21,7 @@ function task(overrides: Partial<TaskInfo>): TaskInfo {
     isOnboarding: false,
     myCompletion: { completedAt: null, note: '' },
     counts: { total: 1, completed: 0 },
+    relatedResourceId: null,
     createdAt: new Date().toISOString(),
     ...overrides,
   };
