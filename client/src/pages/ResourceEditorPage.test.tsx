@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { ResourceEditorPage } from './ResourceEditorPage';
 
@@ -78,5 +78,46 @@ describe('ResourceEditorPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => expect(postMock).toHaveBeenCalledWith('/resources', expect.objectContaining({ kind: 'file' })));
     await waitFor(() => expect(postMock).toHaveBeenCalledWith('/resources/new1/file', expect.any(FormData)));
+  });
+
+  // Regression: React Router keeps the same element mounted across /resources/r1/edit → /resources/r2/edit,
+  // so the form must reset its seeding latch and re-seed from the newly loaded resource.
+  it('re-seeds the form when the edited resource id changes', async () => {
+    const resource = (id: string, title: string) => ({
+      id, title, description: '', kind: 'file', externalUrl: '', fileType: 'pdf',
+      categoryId: 'c1', subcategoryId: null, uploadedBy: 'u1', officeId: null, featured: false,
+      currentFile: null, bookmarked: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+    mockApi();
+    const base = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (url: string) => {
+      if (url === '/resources/r1') return { data: { resource: resource('r1', 'First doc') } };
+      if (url === '/resources/r2') return { data: { resource: resource('r2', 'Second doc') } };
+      return base(url);
+    });
+
+    function EditorWithNav() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <ResourceEditorPage />
+          <button type="button" onClick={() => navigate('/resources/r2/edit')}>go to r2</button>
+        </>
+      );
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/resources/r1/edit']}>
+          <Routes>
+            <Route path="/resources/:id/edit" element={<EditorWithNav />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByDisplayValue('First doc')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'go to r2' }));
+    expect(await screen.findByDisplayValue('Second doc')).toBeInTheDocument();
   });
 });

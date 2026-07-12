@@ -36,6 +36,23 @@ export function ResourceEditorPage() {
 
   // Write-once seed from the loaded resource (same contract as the other editors).
   const [seeded, setSeeded] = useState(false);
+
+  // React Router does not remount this page across /resources/:id/edit → /resources/new (same element),
+  // so reset the form (and the seeding latch) whenever the edited resource changes. Declared before
+  // the seeding effect so on an id change the reset applies first and the seed re-runs cleanly.
+  useEffect(() => {
+    setSeeded(false);
+    setTitle('');
+    setDescription('');
+    setKind('file');
+    setExternalUrl('');
+    setCategoryId('');
+    setSubcategoryId('');
+    setOfficeId('');
+    setFile(null);
+    setError('');
+  }, [id]);
+
   useEffect(() => {
     if (existing && !seeded) {
       setTitle(existing.title);
