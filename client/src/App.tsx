@@ -19,6 +19,7 @@ import { ResourceHubPage } from './pages/ResourceHubPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
 import { TaskEditorPage } from './pages/TaskEditorPage';
 import { TasksPage } from './pages/TasksPage';
+import { BannersPage } from './pages/admin/BannersPage';
 import { CategoriesPage } from './pages/admin/CategoriesPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
 import { TemplatesPage } from './pages/admin/TemplatesPage';
@@ -103,6 +104,14 @@ export function App() {
           element={
             <RequireAuth min="officeAdmin">
               <CategoriesPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/banners"
+          element={
+            <RequireAuth min="officeAdmin">
+              <BannersPage />
             </RequireAuth>
           }
         />
