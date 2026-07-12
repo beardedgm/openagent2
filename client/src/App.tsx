@@ -13,6 +13,7 @@ import { PostEditorPage } from './pages/PostEditorPage';
 import { PostPage } from './pages/PostPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ResourceHubPage } from './pages/ResourceHubPage';
 import { TaskDetailPage } from './pages/TaskDetailPage';
 import { TaskEditorPage } from './pages/TaskEditorPage';
 import { TasksPage } from './pages/TasksPage';
@@ -59,6 +60,7 @@ export function App() {
         <Route path="/calendar/:id" element={<EventDetailPage />} />
         <Route path="/calendar/:id/edit" element={<EventEditorPage />} />
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/resources" element={<ResourceHubPage />} />
         <Route
           path="/tasks/new"
           element={
