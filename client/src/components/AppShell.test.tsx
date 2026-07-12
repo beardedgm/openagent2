@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { lazy } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '../api/types';
@@ -99,6 +100,31 @@ describe('AppShell', () => {
     expect(await screen.findByText('ADMIN')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /users/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it('keeps the shell chrome mounted while a lazy route chunk is loading', async () => {
+    mockAuthAs(baseUser({ role: 'agent', displayName: 'Ana Agent' }));
+    // A lazy route whose chunk never resolves: the outlet stays suspended, so the shell's
+    // own Suspense fallback (Spinner) should render in the content area while the sidebar
+    // and header remain mounted.
+    const NeverResolves = lazy(() => new Promise<{ default: () => JSX.Element }>(() => {}));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/slow']}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/slow" element={<NeverResolves />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText('Acme Realty')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /main navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
   });
 
   it('posts a page-view beacon once for the initial route and does not double-post on rerender', async () => {

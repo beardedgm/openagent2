@@ -1,6 +1,22 @@
-import { Bell, CalendarDays, ClipboardList, FolderOpen, FolderTree, Image, LayoutDashboard, LayoutTemplate, LogOut, Megaphone, Menu, Newspaper, Settings, UserSquare, Users } from 'lucide-react';
+import {
+  Bell,
+  CalendarDays,
+  ClipboardList,
+  FolderOpen,
+  FolderTree,
+  Image,
+  LayoutDashboard,
+  LayoutTemplate,
+  LogOut,
+  Megaphone,
+  Menu,
+  Newspaper,
+  Settings,
+  UserSquare,
+  Users,
+} from 'lucide-react';
 import type { CSSProperties } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useLogout, useMe, useNotifications, usePublicSettings } from '../api/hooks';
@@ -8,6 +24,7 @@ import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useUiStore } from '../store/uiStore';
 import { applyAccentColor } from '../utils/applyAccentColor';
 import { NotificationsDrawer } from './NotificationsDrawer';
+import { Spinner } from './ui/Spinner';
 
 // Below this viewport width, the 240px sidebar no longer fits comfortably alongside content
 // (see DESIGN.md §7). The sidebar becomes an off-canvas overlay, toggled by the same
@@ -35,7 +52,9 @@ function navLinkStyle(isActive: boolean): CSSProperties {
     borderRadius: 'var(--radius-sm)',
     textDecoration: 'none',
     color: isActive ? 'var(--color-accent)' : 'var(--color-text)',
-    background: isActive ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)' : 'transparent',
+    background: isActive
+      ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)'
+      : 'transparent',
     fontWeight: isActive ? 700 : 500,
   };
 }
@@ -304,7 +323,11 @@ export function AppShell() {
             padding: 'var(--space-5)',
           }}
         >
-          <Outlet />
+          {/* Suspense lives here (not above the shell) so sidebar/header stay mounted while a
+              lazy route chunk loads — only the content area shows the spinner. */}
+          <Suspense fallback={<Spinner />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
       <style>{`
