@@ -3,7 +3,7 @@ import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import { useSettings, useUsers } from '../api/hooks';
+import { useResources, useSettings, useUsers } from '../api/hooks';
 import type { EventRecurrence, TaskInfo, TaskPriority } from '../api/types';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { Button } from '../components/ui/Button';
@@ -26,6 +26,8 @@ export function TaskEditorPage() {
   const { data: settings } = useSettings();
   const { data: users } = useUsers();
   const activeUsers = (users ?? []).filter((u) => u.status === 'active');
+  // First page of resources only — a brokerage's hub is small; revisit if it ever paginates meaningfully.
+  const { data: resourceList } = useResources({ page: 1 });
 
   const [title, setTitle] = useState('');
   const [descriptionHtml, setDescriptionHtml] = useState('');
@@ -35,6 +37,7 @@ export function TaskEditorPage() {
   const [audienceType, setAudienceType] = useState<AudienceType>('all');
   const [officeId, setOfficeId] = useState('');
   const [userIds, setUserIds] = useState<string[]>([]);
+  const [relatedResourceId, setRelatedResourceId] = useState('');
 
   function toggleUser(id: string) {
     setUserIds((prev) => (prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id]));
@@ -48,6 +51,7 @@ export function TaskEditorPage() {
         priority,
         dueAt: dueAt ? new Date(dueAt).toISOString() : null,
         recurrence,
+        relatedResourceId: relatedResourceId || null,
         audience: {
           type: audienceType,
           officeId: audienceType === 'office' ? officeId : null,
@@ -130,6 +134,25 @@ export function TaskEditorPage() {
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
             <option value="monthly">Monthly</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gap: 'var(--space-1)', marginBottom: 'var(--space-4)' }}>
+          <label htmlFor="task-resource" style={{ fontWeight: 600, fontSize: 14 }}>
+            Related resource (optional)
+          </label>
+          <select
+            id="task-resource"
+            value={relatedResourceId}
+            onChange={(e) => setRelatedResourceId(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">None</option>
+            {(resourceList?.resources ?? []).map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title}
+              </option>
+            ))}
           </select>
         </div>
 
