@@ -17,6 +17,19 @@ function Harness({ active, onEscape }: { active: boolean; onEscape: () => void }
   );
 }
 
+function InitialFocusHarness({ active }: { active: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const secondRef = useRef<HTMLButtonElement>(null);
+  useFocusTrap(ref, active, () => {}, secondRef);
+  return (
+    <div ref={ref}>
+      <button>First</button>
+      <button ref={secondRef}>Second</button>
+      <button>Last</button>
+    </div>
+  );
+}
+
 describe('useFocusTrap', () => {
   it('moves focus to the first focusable element inside the trap on activate', () => {
     const { rerender } = render(<Harness active={false} onEscape={() => {}} />);
@@ -43,6 +56,16 @@ describe('useFocusTrap', () => {
     render(<Harness active onEscape={onEscape} />);
     fireEvent.keyDown(screen.getByText('First'), { key: 'Escape' });
     expect(onEscape).toHaveBeenCalledTimes(1);
+  });
+
+  it('focuses the initialFocus element on activate while Tab wrapping still uses full order', () => {
+    render(<InitialFocusHarness active />);
+    expect(document.activeElement).toBe(screen.getByText('Second'));
+
+    // Wrapping still spans the whole trap, not just from the initial-focus element.
+    screen.getByText('Last').focus();
+    fireEvent.keyDown(screen.getByText('Last'), { key: 'Tab' });
+    expect(document.activeElement).toBe(screen.getByText('First'));
   });
 
   it('restores focus to the previously focused element on deactivate', () => {

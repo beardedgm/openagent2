@@ -14,7 +14,9 @@ export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose:
   const qc = useQueryClient();
   const navigate = useNavigate();
   const panelRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(panelRef, open, onClose);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  // Initial focus goes to the non-destructive Close control — "Mark all read" is irreversible.
+  useFocusTrap(panelRef, open, onClose, closeButtonRef);
 
   const markRead = useMutation({
     mutationFn: (id: string) => api.post(`/notifications/${id}/read`),
@@ -69,6 +71,7 @@ export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose:
             Mark all read
           </Button>
           <button
+            ref={closeButtonRef}
             aria-label="Close notifications"
             onClick={onClose}
             style={{

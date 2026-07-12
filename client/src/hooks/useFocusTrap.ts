@@ -4,15 +4,24 @@ import { useEffect, useRef } from 'react';
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** Contains Tab focus inside `ref` while `active`; Escape calls onEscape; restores focus on deactivate. */
-export function useFocusTrap(ref: RefObject<HTMLElement>, active: boolean, onEscape: () => void) {
+/**
+ * Contains Tab focus inside `ref` while `active`; Escape calls onEscape; restores focus on
+ * deactivate. Initial focus goes to `initialFocus` when provided (e.g. a safe control such as
+ * a Close button), otherwise the first focusable element inside the trap.
+ */
+export function useFocusTrap(
+  ref: RefObject<HTMLElement>,
+  active: boolean,
+  onEscape: () => void,
+  initialFocus?: RefObject<HTMLElement>,
+) {
   const restoreRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     if (!active || !ref.current) return;
     restoreRef.current = document.activeElement as HTMLElement | null;
     const el = ref.current;
     const focusables = () => [...el.querySelectorAll<HTMLElement>(FOCUSABLE)];
-    focusables()[0]?.focus();
+    (initialFocus?.current ?? focusables()[0])?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -37,5 +46,5 @@ export function useFocusTrap(ref: RefObject<HTMLElement>, active: boolean, onEsc
       el.removeEventListener('keydown', onKey);
       restoreRef.current?.focus();
     };
-  }, [active, ref, onEscape]);
+  }, [active, ref, onEscape, initialFocus]);
 }

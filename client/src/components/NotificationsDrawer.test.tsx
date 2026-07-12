@@ -45,6 +45,13 @@ describe('NotificationsDrawer', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('moves initial focus to the safe Close button, not the destructive Mark all read', async () => {
+    getMock.mockResolvedValue({ data: { notifications: [], unreadCount: 0, nextCursor: null } });
+    render(wrap(<NotificationsDrawer open onClose={() => {}} />));
+    await screen.findByText(/all caught up/i);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /close notifications/i }));
+  });
+
   it('shows an empty state and a mark-all action', async () => {
     getMock.mockResolvedValue({ data: { notifications: [], unreadCount: 0, nextCursor: null } });
     render(wrap(<NotificationsDrawer open onClose={() => {}} />));
