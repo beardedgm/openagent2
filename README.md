@@ -68,7 +68,7 @@ The app builds and runs as a single service: `npm run build` then `npm start` se
 
 - Set `NODE_ENV=production` plus all required/optional env vars in the dashboard (never commit `.env`).
 - Render's disk is ephemeral — set `STORAGE_DRIVER=r2` with the R2 variables above so uploads survive redeploys.
-- Free instances sleep after idle. A free [UptimeRobot](https://uptimerobot.com/) monitor pinging `/api/v1/health` keeps the service awake, comfortably within Render's 750 free hours/month.
+- Free instances sleep after idle. Optionally, a free [UptimeRobot](https://uptimerobot.com/) monitor pinging `/api/v1/health` keeps the service awake within Render's 750 free hours/month. Skipping it is fine too — the first request after idle pays a cold-start delay, and background jobs catch up on wake by design.
 
 See [docs/deploy.md](docs/deploy.md) for the full deployment runbook.
 
