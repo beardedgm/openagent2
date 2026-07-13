@@ -252,4 +252,4 @@ Replace or extend the following when a project differs from these defaults:
 
 ## Maintenance
 
-Review this file after major refactors, auth changes, billing changes, deployment changes, or infrastructure changes. Aim to keep this file under ~300 lines and move deep implementation detail into `docs/`. Last verified: 2026-07-08.
+Review this file after major refactors, auth changes, billing changes, deployment changes, or infrastructure changes. Aim to keep this file under ~300 lines and move deep implementation detail into `docs/`. Last verified: 2026-07-12.

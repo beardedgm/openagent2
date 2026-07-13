@@ -29,6 +29,8 @@ Set every variable in the Render dashboard's **Environment** tab. Never commit `
 | `APP_DOMAIN` | The real public origin of the deployed service (e.g. `https://yourapp.onrender.com` or a custom domain). Used to build links in emails, most notably invitation links — if this is wrong, invited users get broken links. |
 | `PORT` | Render sets this automatically; you generally don't need to set it yourself. The app reads `PORT` and defaults to `3000` if unset. |
 
+**Custom domain:** if you serve the app from a custom domain instead of the `*.onrender.com` URL, `APP_DOMAIN` must be that custom origin (it goes into invitation links), and the Turnstile widget's hostname list must include the custom domain (see the Turnstile section's hostname gotcha). Resend is unaffected — its verification is tied to the `EMAIL_FROM` sending domain, not the app's domain.
+
 **MongoDB SRV DNS gotcha:** Atlas's "Connect" dialog defaults to giving you a `mongodb+srv://...` connection string, which relies on a DNS SRV lookup at connect time. Some networks and container/hosting environments fail this lookup with an error like `querySrv ECONNREFUSED`. Avoid the whole class of failure by using the **non-SRV** form instead: in Atlas, go to **Connect → Drivers**, then look for the toggle/link to the standard connection string (it lists all shard hosts directly as `mongodb://host1,host2,host3/...` instead of using SRV). Use that string for `MONGODB_URI`.
 
 ### Storage (Cloudflare R2)
@@ -107,9 +109,15 @@ These are only read by `npm run seed` (see "First boot" below), not by the runni
 2. Set the **Site Key** as `VITE_TURNSTILE_SITE_KEY` (build-time, client-side) and the **Secret Key** as `TURNSTILE_SECRET_KEY` (runtime, server-side).
 3. Remember: because `VITE_TURNSTILE_SITE_KEY` is inlined at build time, changing it later requires a rebuild, not just a restart.
 
-## 7. UptimeRobot (keep-awake)
+**Hostname gotcha:** the widget's **Hostname management** list must contain the exact domain users load the app from. If it doesn't, the widget renders but fails with error `110200` ("Unknown domain") and every login is rejected with "Bot check failed". In particular, if you later serve the app from a custom domain, add that domain to the widget's hostname list — no key change or rebuild is needed, just the dashboard update.
+
+## 7. UptimeRobot (optional keep-awake)
 
 Render's free tier sleeps services after a period of inactivity, and gives 750 instance-hours/month — enough for one service to run always-on (24 hours × ~31 days ≈ 744 hours), but only if something keeps pinging it so it never goes idle long enough to spin down, and never exceeds the monthly hour budget by running multiple free services simultaneously.
+
+**Skipping the pinger is a valid choice.** The trade-off of letting the service sleep: the first request after idle pays a cold-start delay (typically ~30–60s while Render spins the instance back up), and background jobs (event/task reminders, RSS polling, retention sweeps) run late while asleep. The jobs are idempotent and catch up on wake by design, so nothing is lost — reminders just arrive after the service next wakes.
+
+If you do want the app always-on:
 
 1. Create a free [UptimeRobot](https://uptimerobot.com/) account.
 2. Add an **HTTP(s)** monitor pointed at `https://<your-app-domain>/api/v1/health`.
@@ -144,4 +152,4 @@ Run through this after every fresh deploy (and after any deploy touching auth, s
 - [ ] Upload a resource file → confirm the object appears in the **private** R2 bucket → confirm the download link works (presigned URL, 15-minute expiry).
 - [ ] Upload a logo (or banner image) → confirm the object appears in the **public** R2 bucket and renders via `R2_PUBLIC_BASE_URL`.
 - [ ] Confirm a banner renders on the dashboard.
-- [ ] Check the UptimeRobot dashboard shows consistent 200 responses from `/api/v1/health`.
+- [ ] If using a keep-awake monitor: check its dashboard shows consistent 200 responses from `/api/v1/health`.
